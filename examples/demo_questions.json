@@ -1,0 +1,182 @@
+[
+  {
+    "question": "Wie lange werden technische Testprotokolle gespeichert?",
+    "gold_section_ids": [
+      "DEMO-DP-01"
+    ]
+  },
+  {
+    "question": "Wann erfolgt die Löschung gewöhnlicher Testprotokolle?",
+    "gold_section_ids": [
+      "DEMO-DP-01"
+    ]
+  },
+  {
+    "question": "What is the retention period for technical test logs?",
+    "gold_section_ids": [
+      "DEMO-DP-01"
+    ]
+  },
+  {
+    "question": "Wo wird die Löschung der technischen Protokolle dokumentiert?",
+    "gold_section_ids": [
+      "DEMO-DP-01"
+    ]
+  },
+  {
+    "question": "Wer darf vertrauliche Projektdokumente lesen?",
+    "gold_section_ids": [
+      "DEMO-DP-02"
+    ]
+  },
+  {
+    "question": "Which access model is used for confidential documents?",
+    "gold_section_ids": [
+      "DEMO-DP-02"
+    ]
+  },
+  {
+    "question": "Wie oft werden Zugriffsänderungen überprüft?",
+    "gold_section_ids": [
+      "DEMO-DP-02"
+    ]
+  },
+  {
+    "question": "Was wird bei einer Änderung der Zugriffsrechte protokolliert?",
+    "gold_section_ids": [
+      "DEMO-DP-02"
+    ]
+  },
+  {
+    "question": "Wie schnell werden Auskunftsanfragen an das Datenschutzteam weitergeleitet?",
+    "gold_section_ids": [
+      "DEMO-DP-03"
+    ]
+  },
+  {
+    "question": "Wer bestätigt den Eingang einer Auskunftsanfrage?",
+    "gold_section_ids": [
+      "DEMO-DP-03"
+    ]
+  },
+  {
+    "question": "What must be verified before personal data is disclosed?",
+    "gold_section_ids": [
+      "DEMO-DP-03"
+    ]
+  },
+  {
+    "question": "Wie wird bei einer Anfrage die Identität geprüft?",
+    "gold_section_ids": [
+      "DEMO-DP-03"
+    ]
+  },
+  {
+    "question": "Wie häufig wird die Wiederherstellung von Backups getestet?",
+    "gold_section_ids": [
+      "DEMO-SC-01"
+    ]
+  },
+  {
+    "question": "What evidence makes a backup recovery test successful?",
+    "gold_section_ids": [
+      "DEMO-SC-01"
+    ]
+  },
+  {
+    "question": "Warum ist die Backup-Testumgebung isoliert?",
+    "gold_section_ids": [
+      "DEMO-SC-01"
+    ]
+  },
+  {
+    "question": "Darf der Wiederherstellungstest produktive Zugangsdaten verwenden?",
+    "gold_section_ids": [
+      "DEMO-SC-01"
+    ]
+  },
+  {
+    "question": "Wem werden verdächtige Sicherheitsvorfälle gemeldet?",
+    "gold_section_ids": [
+      "DEMO-SC-02"
+    ]
+  },
+  {
+    "question": "What happens when a data leak is suspected?",
+    "gold_section_ids": [
+      "DEMO-SC-02"
+    ]
+  },
+  {
+    "question": "Was wird jedem Sicherheitsvorfall zugewiesen?",
+    "gold_section_ids": [
+      "DEMO-SC-02"
+    ]
+  },
+  {
+    "question": "Wann ist ein Sicherheitsvorfall zu melden?",
+    "gold_section_ids": [
+      "DEMO-SC-02"
+    ]
+  },
+  {
+    "question": "Wer prüft rechtlich verbindliche KI-Entscheidungen?",
+    "gold_section_ids": [
+      "DEMO-AI-01"
+    ]
+  },
+  {
+    "question": "What should the AI do if supporting documents are insufficient?",
+    "gold_section_ids": [
+      "DEMO-AI-01"
+    ]
+  },
+  {
+    "question": "Müssen Antworten zu juristischen Fragen Quellenhinweise haben?",
+    "gold_section_ids": [
+      "DEMO-AI-01"
+    ]
+  },
+  {
+    "question": "Sind automatisch erzeugte juristische Antworten verbindlich?",
+    "gold_section_ids": [
+      "DEMO-AI-01"
+    ]
+  },
+  {
+    "question": "Welche Prüfungen laufen vor dem Upgrade eines lokalen Sprachmodells?",
+    "gold_section_ids": [
+      "DEMO-AI-02"
+    ]
+  },
+  {
+    "question": "Where are LLM model version numbers recorded?",
+    "gold_section_ids": [
+      "DEMO-AI-02"
+    ]
+  },
+  {
+    "question": "Was muss bei verschlechterten Qualitätsmetriken passieren?",
+    "gold_section_ids": [
+      "DEMO-AI-02"
+    ]
+  },
+  {
+    "question": "Welche Betriebssignale überwacht der lokale Wissensdienst?",
+    "gold_section_ids": [
+      "DEMO-OPS-01"
+    ]
+  },
+  {
+    "question": "Are user questions saved in operational logs?",
+    "gold_section_ids": [
+      "DEMO-OPS-01"
+    ]
+  },
+  {
+    "question": "Was muss nach einem ungeplanten Neustart geprüft werden?",
+    "gold_section_ids": [
+      "DEMO-OPS-01"
+    ]
+  }
+]

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>German Legal RAG — Local Knowledge Assistant</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8eefc;background:#0b1120;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;line-height:1.55}main{max-width:1060px;padding:44px 24px 88px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:65px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}.mark{display:grid;place-items:center;width:35px;height:35px;border-radius:10px;background:#4364ee;color:white;font-size:22px}
+.status{border:1px solid #3f4f70;border-radius:99px;color:#aebfdb;padding:5px 13px;font-size:12px}
+.eyebrow{text-transform:uppercase;letter-spacing:.15em;font-size:12px;color:#91aaf4;font-weight:700;margin:0 0 11px}
+h1{font-size:clamp(32px,4vw,54px);line-height:1.11;letter-spacing:-.045em;max-width:790px;margin:0 0 20px}
+.intro{max-width:730px;color:#9eafca;margin:0 0 35px;font-size:16px}
+.panel{background:#131d32;border:1px solid #2e3b55;border-radius:18px;padding:24px;box-shadow:0 16px 45px #03081645}
+.formlabel{display:block;font-size:13px;font-weight:650;margin:0 0 11px;color:#dce7ff}
+textarea{width:100%;min-height:115px;resize:vertical;background:#0c1528;color:#eaf1ff;border:1px solid #35445f;border-radius:10px;padding:15px 16px;font:inherit;line-height:1.5}
+textarea:focus,select:focus{outline:2px solid #617efd;outline-offset:2px}
+.controls{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+select{border:1px solid #3b4a66;background:#17233a;color:#e5eafa;border-radius:9px;padding:11px 12px;font:inherit}
+button{border:0;background:#6380ff;color:#071020;font-weight:750;padding:11px 22px;border-radius:9px;font:inherit;cursor:pointer}
+button:disabled{opacity:.55;cursor:progress}.hint{color:#95a5c2;font-size:12px;margin-left:auto}
+.examples{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 35px}.example{border:1px solid #36425b;border-radius:99px;color:#c1d1f5;padding:7px 12px;font-size:12px;background:#17233a;cursor:pointer}
+#result{display:none}.result-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+h2{font-size:19px;margin:0 0 12px}.answer{white-space:pre-wrap;color:#e9effa;line-height:1.85;overflow-wrap:anywhere}
+.metrics{font-size:12px;color:#94a5c3}.sources{display:grid;gap:12px;margin-top:18px}
+.source{border:1px solid #384765;background:#101b2e;border-radius:12px;padding:15px}
+.source h3{font-size:14px;margin:0 0 5px}.source p{font-size:13px;color:#a9b9d2;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.source a{color:#9bb3ff;font-size:12px;word-break:break-all}
+footer{color:#8192b0;font-size:12px;margin-top:45px}.disclaimer{border-left:3px solid #7389d0;padding-left:12px}
+#error{display:none;color:#ffd1c2;background:#522c2938;border:1px solid #a55455;border-radius:8px;padding:10px 15px;margin-top:12px}
+@media(max-width:650px){main{padding-top:24px}.top{margin-bottom:50px}.hint{margin-left:0}.panel{padding:17px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div class="brand"><span class="mark">§</span> German Legal RAG <small style="color:#8396b5;font-weight:400">/ local-first</small></div><div class="status" id="health">Checking index…</div></header>
+<p class="eyebrow">Evidence-grounded research</p>
+<h1>Ask the documents.<br>Verify the evidence.</h1>
+<p class="intro">Bilingual legal and compliance retrieval with BM25, dense semantic search, optional reranking, and source-linked answers—all through your locally hosted models.</p>
+<section class="panel">
+<label class="formlabel" for="question">Your question / Ihre Frage</label>
+<textarea id="question" maxlength="800" placeholder="Was besagt § 1 BGB? / What does the source say about access control?"></textarea>
+<div class="controls"><select id="mode" aria-label="Retrieval mode"><option value="dense">Dense only · current pilot baseline</option><option value="hybrid">Hybrid · Equal RRF (baseline)</option><option value="hybrid_dense3">Hybrid · Dense 3x (experiment)</option><option value="bm25">BM25 only</option></select><button id="ask">Ask documents</button><span class="hint">Local indexing required · No cloud API keys</span></div>
+<div id="error" role="alert"></div>
+</section>
+<div class="examples"><button class="example" type="button" data-example="Was regelt § 1 BGB?">§ 1 BGB?</button><button class="example" type="button" data-example="Wann ist eine Person volljährig?">Volljährigkeit?</button><button class="example" type="button" data-example="Was ist ein Verbraucher gemäß § 13 BGB?">§ 13 BGB?</button></div>
+<section id="result" class="panel" aria-live="polite"><div class="result-header"><h2>Grounded answer</h2><div id="metrics" class="metrics"></div></div><div id="answer" class="answer"></div><hr style="border:0;border-top:1px solid #35445d;margin:24px 0"><h2>Retrieved evidence</h2><div id="sources" class="sources"></div></section>
+<footer><p class="disclaimer">Engineering prototype only, not legal advice. Citations identify retrieved text; they do not certify legal correctness or GDPR compliance. Demo source texts are fictional.</p></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function text(tag, value, className){const el=document.createElement(tag);el.textContent=value;if(className)el.className=className;return el;}
+async function health(){try{let r=await fetch('/health');let d=await r.json();$('health').textContent=d.status==='ready'?'● Index loaded':'○ No index';}catch{$('health').textContent='○ Offline';}}
+async function ask(){const query=$('question').value.trim();if(!query){$('question').focus();return;}
+$('ask').disabled=true;$('ask').textContent='Searching…';$('error').style.display='none';$('result').style.display='none';
+try{const response=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,mode:$('mode').value})});
+const data=await response.json();if(!response.ok){throw Error(data.detail||`HTTP ${response.status}`)}
+$('answer').textContent=data.answer;$('metrics').textContent=`${data.metrics.mode} · ${data.metrics.abstained ? "Abstained" : "Answered"} · ${data.metrics.total_ms} ms · ${data.sources.length} sources`;
+$('sources').replaceChildren();
+for(const s of data.sources){let node=text('article','', 'source');node.append(text('h3',`${s.source_id} · ${s.title}`));
+if(s.url.startsWith('https://')&&!s.url.includes('example.invalid')){let a=text('a',s.url);a.href=s.url;a.rel='noopener noreferrer';a.target='_blank';node.append(a)}
+node.append(text('p',s.passage));$('sources').append(node)}$('result').style.display='block';}
+catch(error){$('error').textContent=error.message;$('error').style.display='block';}
+finally{$('ask').disabled=false;$('ask').textContent='Ask documents';}}
+$('ask').addEventListener('click',ask);$('question').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))ask()});
+for(const b of document.querySelectorAll('[data-example]'))b.addEventListener('click',()=>{$('question').value=b.dataset.example;$('question').focus()});
+health();
+</script>
+</body>
+</html>

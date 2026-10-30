@@ -1,0 +1,58 @@
+[
+  {
+    "id": "DEMO-DP-01",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "Datenschutz: Aufbewahrungsfrist für Testprotokolle",
+    "text": "Diese fiktive interne Richtlinie sieht eine Aufbewahrungsfrist von 30 Tagen für gewöhnliche technische Testprotokolle vor. Nach Ablauf der Frist werden die Protokolle gelöscht, sofern keine dokumentierte Ausnahme vorliegt.\n\nDie Löschung wird im lokalen Löschjournal ohne Speicherung personenbezogener Protokollinhalte dokumentiert.",
+    "url": "https://example.invalid/demo/dp-01"
+  },
+  {
+    "id": "DEMO-DP-02",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "Datenschutz: Rollenbasierter Zugriff",
+    "text": "Für vertrauliche Projektdokumente gilt eine rollenbasierte Zugriffskontrolle. Nur Mitglieder der zugewiesenen Projektgruppe dürfen diese Dokumente lesen.\n\nAlle Zugriffsänderungen werden protokolliert und einmal monatlich durch die zuständige Person überprüft.",
+    "url": "https://example.invalid/demo/dp-02"
+  },
+  {
+    "id": "DEMO-SC-01",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "IT-Sicherheit: Wiederherstellung von Backups",
+    "text": "Das Wiederherstellungsverfahren für verschlüsselte Backups wird vierteljährlich getestet. Ein erfolgreicher Test benötigt ein überprüftes Prüfsummenprotokoll.\n\nDer Wiederherstellungstest findet in einer isolierten Testumgebung statt, die keinen Zugriff auf produktive Zugangsdaten besitzt.",
+    "url": "https://example.invalid/demo/sc-01"
+  },
+  {
+    "id": "DEMO-AI-01",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "KI-Governance: Menschliche Freigabe",
+    "text": "Automatisch erzeugte Antworten zu juristischen Fragen werden als unverbindliche Recherchehilfe gekennzeichnet. Rechtsverbindliche Entscheidungen erfordern eine Prüfung durch qualifizierte Personen.\n\nJede Antwort muss nachvollziehbare Quellenhinweise enthalten; ohne hinreichende Dokumentengrundlage soll das System eine Antwort verweigern.",
+    "url": "https://example.invalid/demo/ai-01"
+  },
+  {
+    "id": "DEMO-DP-03",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "Datenschutz: Auskunftsanfragen",
+    "text": "Auskunftsanfragen zu personenbezogenen Testdaten werden innerhalb von 14 Kalendertagen an das Datenschutzteam weitergeleitet. Das Team bestätigt den Eingang an die anfragende Person.\n\nVor der Herausgabe personenbezogener Daten wird die Identität der anfragenden Person geprüft.",
+    "url": "https://example.invalid/demo/dp-03"
+  },
+  {
+    "id": "DEMO-SC-02",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "IT-Sicherheit: Meldung von Sicherheitsvorfällen",
+    "text": "Verdächtige Sicherheitsvorfälle sollen unverzüglich an das interne Incident-Response-Team gemeldet werden. Bei vermuteten Datenabflüssen wird der betroffene Dienst bis zur technischen Bewertung isoliert.\n\nJeder Vorfall erhält eine interne Vorgangsnummer und einen dokumentierten Zeitstempel.",
+    "url": "https://example.invalid/demo/sc-02"
+  },
+  {
+    "id": "DEMO-AI-02",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "KI-Governance: Modellaktualisierung",
+    "text": "Vor dem Einsatz einer neuen lokalen Sprachmodell-Version werden die Retrieval-Benchmarks und die Antwortzitationsprüfungen erneut ausgeführt. Eine Verschlechterung der Qualitätsmetriken muss vor der Freigabe begründet werden.\n\nDer Modellname, die Versionskennung und die Ergebnisse werden im technischen Freigabeprotokoll festgehalten.",
+    "url": "https://example.invalid/demo/ai-02"
+  },
+  {
+    "id": "DEMO-OPS-01",
+    "law": "FIKTIVE_INTERNE_RICHTLINIE",
+    "title": "Betrieb: Monitoring und Wiederanlauf",
+    "text": "Der lokale Wissensdienst überwacht Antwortlatenz, Fehlerrate und Verfügbarkeit ohne Speicherung von Benutzerfragen in technischen Betriebslogs. Ein wiederkehrender Fehler löst eine interne Alarmmeldung aus.\n\nNach einem ungeplanten Neustart erfolgt zunächst eine Integritätsprüfung des Dokumentenindexes, bevor der Dienst wieder freigegeben wird.",
+    "url": "https://example.invalid/demo/ops-01"
+  }
+]

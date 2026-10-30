@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+.env
+state/
+data/raw/*
+!data/raw/.gitkeep
+reports/*.json
+reports/*.md
+*.egg-info/
+dist/
+build/
+
+# Generated evaluation reports, including nested folders
+reports/
