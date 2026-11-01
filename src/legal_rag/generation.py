@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from time import perf_counter
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -18,6 +19,54 @@ from legal_rag.ollama import Ollama
 ABSTAIN_DE = "Die bereitgestellten Quellen reichen für eine verlässliche Antwort nicht aus."
 ABSTAIN_EN = "The supplied sources are insufficient for a reliable answer."
 CITATION = re.compile(r"\[S\d+\]")
+# Keep this conservative splitter aligned with the claim-audit export.
+SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])")
+
+# Only explicit, unambiguous BGB references are scoped. Generic legal questions
+# continue to use the normal retriever; this is not a semantic entailment check.
+BGB_SECTION_GROUP = re.compile(
+    r"§{1,2}\s*(\d+[a-z]?(?:\s*(?:,|und|and|&)\s*\d+[a-z]?)*)",
+    re.IGNORECASE,
+)
+BGB_SECTION_WORD = re.compile(
+    r"\b(?:sections?|sec\.?|paragraphs?|paras?\.?|paragraf(?:en)?)\s+(\d+[a-z]?)\b",
+    re.IGNORECASE,
+)
+
+
+def requested_bgb_sections(query: str) -> set[str]:
+    """Extract explicitly numbered BGB sections, not inferred legal references."""
+    if re.search(r"\bBGB\b", query, flags=re.IGNORECASE) is None:
+        return set()
+    result = {match.group(1).casefold() for match in BGB_SECTION_WORD.finditer(query)}
+    for match in BGB_SECTION_GROUP.finditer(query):
+        result.update(n.casefold() for n in re.findall(r"\d+[a-z]?", match.group(1), re.I))
+    return result
+
+
+def hit_bgb_section(hit: Hit) -> str | None:
+    """Use the passage's trusted source identity, never a mention in its prose."""
+    if hit.passage.law.casefold() != "bgb":
+        return None
+    url = urlsplit(hit.passage.url)
+    if url.scheme != "https" or url.netloc != "www.gesetze-im-internet.de":
+        return None
+    match = re.fullmatch(r"/bgb/__(\d+[a-z]?)\.html", url.path, re.I)
+    return match.group(1).casefold() if match else None
+
+
+def scope_explicit_bgb_evidence(query: str, hits: list[Hit]) -> list[Hit] | None:
+    """Fail closed when the explicitly requested statute is missing from top-k.
+
+    None means no explicit BGB reference; [] means missing required evidence.
+    This guard does not verify legal interpretation or support cross-law queries.
+    """
+    required = requested_bgb_sections(query)
+    if not required:
+        return None
+    matches = [hit for hit in hits if hit_bgb_section(hit) in required]
+    present = {number for hit in matches if (number := hit_bgb_section(hit))}
+    return matches if required.issubset(present) else []
 
 
 class StructuredAnswer(BaseModel):
@@ -39,7 +88,14 @@ Return a JSON object conforming to the specified schema with exactly:
 - citations: unique source IDs used in the answer, e.g. ["S1"], or [] if insufficient.
 If sources do not support the requested fact, status MUST be "insufficient_evidence".
 Never mark a refusal to answer as "answered", even if it cites source labels.
-Cite EVERY factual assertion, and use only labels from the supplied evidence.
+For simple, directly answerable questions, prefer exactly ONE concise factual sentence
+ending with a source citation [S1]. For more complex answers, place a source
+citation at the end of EVERY factual sentence. Never cite only a later sentence
+when an earlier sentence makes a factual claim. Do not repeat the same fact.
+Preserve all qualifying conditions, exceptions, and requirements in the cited
+source. Do not conflate different legal remedies or omit preconditions.
+If the full claim cannot be supported, omit it or abstain.
+Use only labels from the supplied evidence.
 Do not invent citations. Do not cite irrelevant documents.
 Avoid personalized legal advice; for decisions recommend consulting a professional.
 Distinguish statutory text from interpretation and note temporal uncertainty.
@@ -86,51 +142,137 @@ def _refuse(query: str, duration: float, reason: str) -> tuple[str, list[dict], 
     )
 
 
-def generate(query: str, hits: list[Hit], model: Ollama) -> tuple[str, list[dict], dict]:
+def every_sentence_cited(answer: str) -> bool:
+    """Require citation tokens on each sentence-like unit, not just somewhere.
+
+    This is structural validation only, not proof the citation supports a claim.
+    Legal abbreviations and complex prose may need subsequent human review.
+    """
+    units = [part.strip() for part in SENTENCE_SPLIT.split(answer.strip()) if part.strip()]
+    return bool(units) and all(CITATION.search(unit) is not None for unit in units)
+
+
+def citation_validation_error(output: StructuredAnswer, evidence: str) -> str | None:
+    """Return a structural error code, or None for a valid citation contract.
+
+    The result says nothing about whether any source actually entails a claim.
+    Do not log unredacted questions, sources, or answers in telemetry.
+    """
+    if not output.answer.strip():
+        return "empty_answer"
+    inline = {tag[1:-1] for tag in CITATION.findall(output.answer)}
+    if not inline:
+        return "missing_inline_citation"
+    allowed = set(re.findall(r'<source id="(S\d+)"', evidence))
+    if not inline.issubset(allowed):
+        return "unknown_source_id"
+    if not every_sentence_cited(output.answer):
+        return "uncited_sentence"
+    declared = output.citations
+    if not declared:
+        return "missing_citation_list"
+    if len(declared) != len(set(declared)):
+        return "duplicate_citation_list"
+    if set(declared) != inline:
+        return "citation_list_mismatch"
+    return None
+
+
+def _validate_cited_answer(output: StructuredAnswer, evidence: str) -> bool:
+    """Check *structural* citations only; no factual entailment guarantee."""
+    return citation_validation_error(output, evidence) is None
+
+
+def generate(
+    query: str, hits: list[Hit], model: Ollama, *, retry_on_failure: bool = False
+) -> tuple[str, list[dict], dict]:
+    """Answer with strict citations; optionally repair malformed output once.
+
+    Never retry an explicit model insufficient-evidence decision. Any second
+    attempt uses identical evidence and must pass the same citation validator.
+    """
     if not hits:
         return _refuse(query, 0, "no_retrieval_hits")
+    scoped = scope_explicit_bgb_evidence(query, hits)
+    if scoped is not None:
+        if not scoped:
+            answer, sources, metrics = _refuse(
+                query, 0, "requested_bgb_section_not_retrieved"
+            )
+            metrics["generation_attempts"] = 0
+            return answer, sources, metrics
+        # Renumber citations after filtering out unrelated BGB sections.
+        hits = scoped
     evidence = build_evidence(hits)
     if not evidence:
         return _refuse(query, 0, "no_evidence_in_context")
 
     language = "German" if appears_german(query) else "English"
-    # Separate, explicit output-language instruction reduces unintended German
-    # responses to English questions when all retrieved legal evidence is German.
     user_prompt = (
         f"REQUIRED_ANSWER_LANGUAGE: {language}\n"
         f"Write all explanations in {language}; keep statutory titles and citations unchanged.\n"
+        "For a short direct question, give ONE short factual sentence ending "
+        "with a source citation like [S1]. Do not add an uncited introduction.\n"
         f"QUESTION:\n{query}\n\n<evidence>\n{evidence}\n</evidence>"
     )
-    start = perf_counter()
-    raw = model.chat(
-        SYSTEM,
-        user_prompt,
-        response_format=StructuredAnswer.model_json_schema(),
-    )
-    generation_ms = round((perf_counter() - start) * 1000, 2)
-    try:
-        output = StructuredAnswer.model_validate_json(raw)
-    except (ValidationError, ValueError):
-        return _refuse(query, generation_ms, "invalid_model_response")
+    started = perf_counter()
+    attempts = 0
+    first_failure = None
+    first_validation_error = None
+    output = None
+    failure = None
+    validation_error = None
+    for attempt in range(2 if retry_on_failure else 1):
+        attempts += 1
+        instruction = user_prompt
+        if attempt:
+            instruction += (
+                "\n\nSECOND-PASS FORMAT REPAIR: The first attempt failed structural "
+                f"validation ({first_validation_error or first_failure}). "
+                "Using only the SAME evidence, write exactly ONE short factual "
+                "sentence ending with a valid [S#] citation. Put that ID in the "
+                "citations array. Include all legally necessary conditions. "
+                "If evidence does not justify the sentence, return insufficient_evidence. "
+                "Do not invent facts or citations."
+            )
+        raw = model.chat(
+            SYSTEM, instruction, response_format=StructuredAnswer.model_json_schema()
+        )
+        validation_error = None
+        try:
+            output = StructuredAnswer.model_validate_json(raw)
+        except (ValidationError, ValueError):
+            failure = "invalid_model_response"
+            validation_error = "invalid_json_schema"
+        else:
+            if output.status == "insufficient_evidence":
+                failure = "model_insufficient_evidence"
+            else:
+                validation_error = citation_validation_error(output, evidence)
+                failure = "invalid_citations_or_empty_answer" if validation_error else None
+        if failure is None:
+            break
+        if first_failure is None:
+            first_failure = failure
+            first_validation_error = validation_error
+        # Retry only malformed output; a model refusal is a substantive decision.
+        # Never loop merely to force an answer, and never accept unknown source IDs.
+        if failure == "model_insufficient_evidence" or validation_error == "unknown_source_id":
+            break
 
-    if output.status == "insufficient_evidence":
-        return _refuse(query, generation_ms, "model_insufficient_evidence")
+    elapsed = round((perf_counter() - started) * 1000, 2)
+    if failure is not None:
+        answer, sources, metrics = _refuse(query, elapsed, failure)
+        metrics.update({
+            "generation_attempts": attempts,
+            "first_pass_failure": first_failure,
+            "first_pass_validation_error": first_validation_error,
+            "final_validation_error": validation_error,
+        })
+        return answer, sources, metrics
 
-    # Fail closed on empty answer, unknown labels, or inconsistency between
-    # textual citations and structured citations. This is not entailment checking.
+    assert output is not None
     inline = {tag[1:-1] for tag in CITATION.findall(output.answer)}
-    declared = output.citations
-    allowed = set(re.findall(r'<source id="(S\d+)"', evidence))
-    if (
-        not output.answer.strip()
-        or not inline
-        or not declared
-        or len(declared) != len(set(declared))
-        or set(declared) != inline
-        or not inline.issubset(allowed)
-    ):
-        return _refuse(query, generation_ms, "invalid_citations_or_empty_answer")
-
     sources = [
         hit.to_source(f"S{i}")
         for i, hit in enumerate(hits, start=1)
@@ -139,5 +281,13 @@ def generate(query: str, hits: list[Hit], model: Ollama) -> tuple[str, list[dict
     return (
         output.answer.strip(),
         sources,
-        {"generation_ms": generation_ms, "abstained": False, "abstention_reason": None},
+        {
+            "generation_ms": elapsed,
+            "abstained": False,
+            "abstention_reason": None,
+            "generation_attempts": attempts,
+            "first_pass_failure": first_failure,
+            "first_pass_validation_error": first_validation_error,
+            "final_validation_error": None,
+        },
     )

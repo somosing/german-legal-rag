@@ -23,7 +23,9 @@ class RAGService:
             raise ValueError("Query must contain 1 to 800 characters")
         start = perf_counter()
         hits, retrieval = self.retriever.search(query, mode=mode)
-        answer, sources, generation = generate(query, hits, self.model)
+        answer, sources, generation = generate(
+            query, hits, self.model, retry_on_failure=self.settings.retry_on_failure
+        )
         return {
             "answer": answer,
             "sources": sources,

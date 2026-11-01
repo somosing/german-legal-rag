@@ -56,7 +56,12 @@ class Index:
         (self.root / "qdrant").mkdir(parents=True, exist_ok=True)
         return QdrantClient(path=str(self.root / "qdrant"))
 
-    def build(self, sections: list[Section], batch_size: int = 16) -> dict:
+    def build(
+        self,
+        sections: list[Section],
+        batch_size: int = 16,
+        source_metadata: dict | None = None,
+    ) -> dict:
         from qdrant_client import models
 
         if not sections:
@@ -107,6 +112,7 @@ class Index:
             "passage_count": len(passages),
             "indexed_utc": datetime.now(UTC).isoformat(),
             "source_disclaimer": "Source texts must be verified against authoritative versions.",
+            "source_metadata": source_metadata or {},
         }
         save_json(self.root / "manifest.json", manifest)
         return manifest

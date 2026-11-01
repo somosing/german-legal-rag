@@ -145,7 +145,7 @@ Copy `.env.example` to `.env` for reference, or set values with `export` (the ap
 
 ## Quality checks
 
-When dependency resolution is available, run `uv lock` once and commit the generated `uv.lock` for reproducible installs. A lockfile is intentionally not included in this starter because the package registry was inaccessible during preparation.
+The repository includes a committed `uv.lock` for reproducible dependency resolution. Run `uv sync --locked --extra dev` to install the tested dependency set.
 
 ```bash
 uv sync --extra dev
@@ -214,12 +214,12 @@ gh repo create german-legal-rag --public --source=. --remote=origin --push
 
 The publish command requires the GitHub CLI (`gh`) and your own logged-in account. Run it only after inspecting the repository content and choosing public/private visibility.
 
-## Experiment: dense-weighted fusion (not yet validated)
+## Experiment: dense-weighted fusion (pilot benchmark measured)
 
 The original `hybrid` mode uses equal-weight RRF (BM25 1x, dense 1x).
-A new `hybrid_dense3` mode tests an experimental 3:1 dense:BM25 fusion
-weight. **This is a hypothesis, not a claimed improvement**; it requires
-re-running evaluation on your machine. The existing baseline is untouched.
+The `hybrid_dense3` mode tests a 3:1 dense:BM25 fusion weight. On the
+30-question BGB pilot it did **not** improve Hit@4 over equal-weight hybrid
+(0.900 for both); see `docs/BENCHMARKS.md`. The original baseline remains intact.
 
 ```bash
 uv run pytest -q
@@ -292,6 +292,71 @@ not make legal accuracy, hallucination-free, or GDPR-compliance claims. The fixt
 is a non-blind pilot and needs independent review. Generated text is saved to the
 report, so use only public test questions unless retention/privacy has been reviewed.
 
-## Measured benchmark results
 
-See [local benchmark results](docs/BENCHMARKS.md) for retrieval, answer-contract, latency measurements, and limitations.
+## Faithfulness audit and corpus expansion (post-v0.1.0)
+
+A new reviewer-annotated claim-support workflow complements the existing deterministic
+citation/abstention benchmark. It exports answered claims alongside the cited
+passages and requires reviewer labels, declared review provenance and exact quotations. No score
+is invented for unreviewed claims.
+
+```bash
+# With the 100-section BGB index, run the original answer benchmark:
+uv run legal-rag eval-answers --gold examples/bgb_answer_questions.json \
+  --output reports/bgb_answers_review --mode dense
+uv run legal-rag audit-export \
+  --report reports/bgb_answers_review/answer_report.json \
+  --output reports/faithfulness/review.json
+# Edit review.json: declare review_method and mark supported / unsupported / unclear.
+uv run legal-rag audit-score \
+  --annotations reports/faithfulness/review.json \
+  --output reports/faithfulness/score
+
+# Preview full BGB coverage without overwriting the index:
+uv run legal-rag ingest --source bgb --dry-run
+```
+
+Read [Human-reviewed faithfulness audit and expansion](docs/FAITHFULNESS_AUDIT.md)
+for reviewer guidance, explicit limitations and safe full-corpus ingestion.
+**Rebuild the benchmark fixture when the BGB index changes:** the original
+negative examples depend on sections beyond the first 100 being absent.
+
+## Citation and review limitations
+
+Generation rejects answers containing sentence-like factual units without a source
+citation and instructs the model to preserve legal preconditions. This is a
+**structural guardrail**, not semantic verification; legal interpretations still
+require reviewer assessment. Claim-review JSON has a `review_method` field so
+AI-assisted preliminary audits cannot silently be presented as independent
+human reviews. The field is self-declared and must be reported transparently.
+
+
+## Experiment: opt-in bounded generation retry
+
+The strict sentence-level citation validator may reject an answerable response,
+reducing answer coverage. The optional retry performs **one more model call**
+with the **same retrieved evidence** only when the initial response is malformed
+or has a repairable structural citation failure. An explicit `insufficient_evidence`
+decision is **never retried**, and an invented source ID fails closed immediately.
+The second prompt requests a single, fully cited factual sentence. The final
+response must still satisfy every citation check. This is a research experiment;
+retry may increase latency and cannot establish factual faithfulness, so it is
+**disabled by default**.
+
+```bash
+# Run the current baseline first (100-section index; stop the web server):
+uv run legal-rag eval-answers --gold examples/bgb_answer_questions.json \
+  --output reports/retry_baseline --mode dense
+# Then run the opt-in retry ablation on the identical index:
+RAG_RETRY_ON_FAILURE=true uv run legal-rag eval-answers \
+  --gold examples/bgb_answer_questions.json \
+  --output reports/retry_enabled --mode dense
+```
+
+Both reports include `generation_attempts`, `first_pass_failure`,
+`first_pass_validation_error`, `final_validation_error`, and `abstention_reason`.
+The validation details are structural codes (for example, `uncited_sentence`),
+not raw text. Use these to distinguish model refusals from malformed citations.
+Do not assume the retry improves support/faithfulness: manually audit claims
+again and check that all six negative cases still abstain. The extra inference
+call increases latency when triggered.
