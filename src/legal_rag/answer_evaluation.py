@@ -40,6 +40,21 @@ def _percentile(values: list[float], p: float) -> float:
     return sorted_values[max(0, math.ceil(p * len(sorted_values)) - 1)]
 
 
+def _required_condition_checks(answer: str, requirements: list[dict]) -> list[dict]:
+    """Check curated words; presence does not establish legal entailment."""
+    plain = " ".join(CITATION_RE.sub("", answer).casefold().split())
+    return [
+        {
+            "id": requirement["id"],
+            "matched": any(
+                " ".join(term.casefold().split()) in plain
+                for term in requirement["any_of"]
+            ),
+        }
+        for requirement in requirements
+    ]
+
+
 def _validate_fixture(samples: object, sections: dict[str, Section]) -> list[dict]:
     if not isinstance(samples, list) or not samples:
         raise ValueError("Answer benchmark needs a non-empty JSON list")
@@ -57,6 +72,27 @@ def _validate_fixture(samples: object, sections: dict[str, Section]) -> list[dic
             raise ValueError(f"Sample {i}: invalid expected_status")
         if language not in {"de", "en"}:
             raise ValueError(f"Sample {i}: language must be de or en")
+        requirements = sample.get("required_answer_concepts", [])
+        if not isinstance(requirements, list):
+            raise ValueError(f"Sample {i}: required_answer_concepts must be a list")
+        if requirements and status != "answered":
+            raise ValueError(f"Sample {i}: negative cases cannot require answer concepts")
+        seen: set[str] = set()
+        for requirement in requirements:
+            if not isinstance(requirement, dict) or set(requirement) != {"id", "any_of"}:
+                raise ValueError(f"Sample {i}: invalid answer concept definition")
+            identifier = requirement["id"]
+            alternatives = requirement["any_of"]
+            if (
+                not isinstance(identifier, str)
+                or not identifier.strip()
+                or identifier in seen
+                or not isinstance(alternatives, list)
+                or not alternatives
+                or any(not isinstance(t, str) or not t.strip() for t in alternatives)
+            ):
+                raise ValueError(f"Sample {i}: invalid required answer concept")
+            seen.add(identifier)
         gold_urls = sample.get("gold_section_urls", [])
         absent_urls = sample.get("absent_section_urls", [])
         if any(
@@ -120,13 +156,19 @@ def evaluate_answers(
                 "parent_excerpt": parent.text[:1450] if parent else "",
             })
         gold_cited = bool(returned_urls & set(sample.get("gold_section_urls", [])))
+        condition_checks = _required_condition_checks(
+            response["answer"], sample.get("required_answer_concepts", [])
+        )
         status_correct = actual_status == sample["expected_status"]
         observed_language = observed_answer_language(response["answer"])
         language_match = (
             observed_language == sample["language"] if observed_language else None
         )
-        case_passed = status_correct and citation_valid and (
-            gold_cited if sample["expected_status"] == "answered" else True
+        case_passed = (
+            status_correct
+            and citation_valid
+            and (gold_cited if sample["expected_status"] == "answered" else True)
+            and all(check["matched"] for check in condition_checks)
         )
         rows.append(
             {
@@ -140,6 +182,7 @@ def evaluate_answers(
                     gold_cited if sample["expected_status"] == "answered" else None
                 ),
                 "case_passed": case_passed,
+                "required_condition_checks": condition_checks,
                 "observed_answer_language": observed_language,
                 "language_match_heuristic": language_match,
                 "returned_source_urls": sorted(returned_urls),
@@ -157,6 +200,9 @@ def evaluate_answers(
     positives = [r for r in rows if r["expected_status"] == "answered"]
     negatives = [r for r in rows if r["expected_status"] == "insufficient_evidence"]
     durations = [r["total_ms"] for r in rows]
+    condition_checks = [
+        check for row in rows for check in row["required_condition_checks"]
+    ]
     classified = [r for r in rows if r["language_match_heuristic"] is not None]
     language_mismatches = [r for r in classified if not r["language_match_heuristic"]]
     summary = {
@@ -172,6 +218,11 @@ def evaluate_answers(
         "negative_abstention_rate": round(
             mean(r["actual_status"] == "insufficient_evidence" for r in negatives), 4
         ) if negatives else None,
+        "required_condition_check_count": len(condition_checks),
+        "required_condition_match_rate": (
+            round(mean(check["matched"] for check in condition_checks), 4)
+            if condition_checks else None
+        ),
         "language_checked_count": len(classified),
         "suspected_language_mismatch_count": len(language_mismatches),
         "language_match_rate_of_checked": (
@@ -203,6 +254,8 @@ def evaluate_answers(
         "limitations": [
             "Citation consistency verifies labels/URLs, not whether legal claims are entailed "
             "by cited text.",
+            "Required answer concepts are lexical checks, not proof of entailment; "
+            "they may miss paraphrases or accept false statements containing the terms.",
             "These are curated in/out-of-corpus questions, not blinded legal QA accuracy.",
             "Negative labels concern only the current indexed section subset; "
             "these legal questions may have valid answers outside that subset.",
@@ -246,6 +299,7 @@ def evaluate_answers(
                 f"- Expected/actual: `{row['expected_status']}` / `{row['actual_status']}`",
                 f"- Citation labels consistent: `{row['citation_consistent']}`",
                 f"- Gold section cited: `{row['gold_section_cited']}`",
+                f"- Required concepts (lexical): {row['required_condition_checks'] or '(none)'}",
                 f"- Generation attempts: `{row['generation_attempts']}`",
                 f"- First-pass failure: `{row['first_pass_failure']}`",
                 f"- First-pass validation detail: `{row['first_pass_validation_error']}`",
