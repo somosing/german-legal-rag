@@ -3,72 +3,112 @@
     "question": "Wann beginnt die Rechtsfähigkeit eines Menschen?",
     "language": "de",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__1.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__1.html"
+    ]
   },
   {
     "question": "At what age does someone attain legal adulthood under the BGB?",
     "language": "en",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__2.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__2.html"
+    ]
   },
   {
     "question": "Unter welchen Umständen kann jemand wegen der Nutzung seines Namens Unterlassung verlangen?",
     "language": "de",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__12.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__12.html"
+    ],
+    "required_answer_concepts": [
+      {
+        "id": "future_interference_condition",
+        "any_of": [
+          "weitere Beeinträchtigungen",
+          "weitere Beeinträchtigung",
+          "Wiederholungsgefahr",
+          "erneute Beeinträchtigungen",
+          "erneute Beeinträchtigung",
+          "künftige Beeinträchtigungen",
+          "künftige Beeinträchtigung",
+          "zukünftige Beeinträchtigungen",
+          "zukünftige Beeinträchtigung"
+        ]
+      }
+    ]
   },
   {
     "question": "Who qualifies as a consumer under the BGB?",
     "language": "en",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__13.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__13.html"
+    ]
   },
   {
     "question": "Wer gilt nach dem BGB als Unternehmer?",
     "language": "de",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__14.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__14.html"
+    ]
   },
   {
     "question": "How long is the waiting period for distributing the property of a dissolved association?",
     "language": "en",
     "expected_status": "answered",
-    "gold_section_urls": ["https://www.gesetze-im-internet.de/bgb/__51.html"]
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__51.html"
+    ]
   },
   {
     "question": "Welche Pflichten hat der Verkäufer gemäß § 433 BGB?",
     "language": "de",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__433.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__433.html"
+    ]
   },
   {
     "question": "What obligations does a landlord have under section 535 BGB?",
     "language": "en",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__535.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__535.html"
+    ]
   },
   {
     "question": "Welche Voraussetzungen für Schadensersatz stehen in § 280 BGB?",
     "language": "de",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__280.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__280.html"
+    ]
   },
   {
     "question": "What does section 823 BGB say about liability for damages?",
     "language": "en",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__823.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__823.html"
+    ]
   },
   {
     "question": "Was regelt § 985 BGB zum Herausgabeanspruch?",
     "language": "de",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__985.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__985.html"
+    ]
   },
   {
     "question": "What does section 611a BGB require in an employment contract?",
     "language": "en",
     "expected_status": "insufficient_evidence",
-    "absent_section_urls": ["https://www.gesetze-im-internet.de/bgb/__611a.html"]
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__611a.html"
+    ]
   }
 ]

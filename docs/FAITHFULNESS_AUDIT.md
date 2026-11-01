@@ -16,6 +16,19 @@ uv run legal-rag eval-answers \
 
 **Do not reuse that exact fixture after indexing the full BGB.** Its six negative questions concern provisions deliberately missing from the original 100-section subset; they will no longer be valid negative examples. Create a new benchmark with genuinely unanswerable, contradictory, or out-of-scope cases and independently verified labels for the expanded corpus.
 
+## 1a. Required-condition checks in answer benchmarks
+
+Positive cases may define `required_answer_concepts` (each with an `id`
+and nonempty `any_of` alternatives). The § 12 BGB question requires an
+explicit reference to the risk of further interference, or the established
+term `Wiederholungsgefahr`. A response that cites § 12 but does not mention
+that condition fails the answer-contract case.
+
+The `required_condition_match_rate` is a **curated lexical smoke test**,
+not an entailment metric: it can miss valid paraphrases and can accept
+negated or otherwise inaccurate statements containing the same words.
+Never present this as verified legal correctness. Human review is required.
+
 ## 2. Export reviewer claims and evidence
 
 ```bash
