@@ -73,6 +73,22 @@ The scorer validates cited source IDs and exact source quotations for `supported
 
 Generated reports and annotations are gitignored. Do not submit sensitive material or individual question/answer logs without data-retention review. Publish aggregate scores only after inspection and clear disclosure of sample size, reviewer process, corpus snapshot, and limitations.
 
+## Specific legal prerequisite guard (pilot)
+
+A separate generation safeguard is scoped to an **injunction question that retrieves
+§ 12 BGB**. It activates only when the actual retrieved text contains the exact
+statutory clause about further interference. The answer prompt highlights that
+source clause, and post-generation validation refuses or optionally repairs
+answers omitting the future-interference condition or failing to cite the source.
+
+This rule is narrow and intentionally transparent. It is not a general legal
+entailment model and does not ensure that all other legal prerequisites or
+exceptions are preserved. Its term check can accept a negated or otherwise
+misleading statement; a human reviewer must still evaluate each assertion.
+If the section cannot be retrieved, the existing exact-section guard takes
+priority. Re-run the positive and negative evaluations before enabling
+the optional bounded repair in deployment.
+
 ## 4. Expand the BGB corpus carefully
 
 Stop the API, then inspect the full BGB without overwriting Qdrant:
