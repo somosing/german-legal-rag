@@ -69,6 +69,47 @@ def scope_explicit_bgb_evidence(query: str, hits: list[Hit]) -> list[Hit] | None
     return matches if required.issubset(present) else []
 
 
+# Audited, source-specific rule: an injunction under § 12 BGB also requires
+# concern about further interference. This is deliberately not a general
+# entailment engine; expand rules only after legal review.
+BGB12_INJUNCTION_CLAUSE = (
+    "Sind weitere Beeinträchtigungen zu besorgen, so kann er auf Unterlassung klagen."
+)
+INJUNCTION_QUESTION = re.compile(
+    r"\bunterlassung\b|\binjunction\b|\bcease[- ]and[- ]desist\b",
+    re.IGNORECASE,
+)
+FUTURE_INTERFERENCE = re.compile(
+    r"weitere\s+beeinträchtig\w*|wiederholungsgefahr|"
+    r"(?:erneute|erneuten|künftige|künftigen|zukünftige|zukünftigen)\s+beeinträchtig\w*|"
+    r"(?:further|future)\s+(?:interference|infringement)|"
+    r"risk\s+of\s+(?:repetition|further\s+(?:interference|infringement))",
+    re.IGNORECASE,
+)
+
+
+def critical_statutory_condition(
+    query: str, hits: list[Hit]
+) -> tuple[str, str] | None:
+    """Find an audited condition only when its exact clause is in evidence.
+
+    Returns (citation label, verified source clause), not an unsourced legal rule.
+    The check is intentionally limited to § 12 BGB injunction questions.
+    """
+    if not INJUNCTION_QUESTION.search(query):
+        return None
+    expected = " ".join(BGB12_INJUNCTION_CLAUSE.casefold().split())
+    for index, hit in enumerate(hits, start=1):
+        if hit_bgb_section(hit) != "12":
+            continue
+        context = " ".join(
+            (hit.passage.text + " " + hit.parent_text).casefold().split()
+        )
+        if expected in context:
+            return f"S{index}", BGB12_INJUNCTION_CLAUSE
+    return None
+
+
 class StructuredAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -206,6 +247,10 @@ def generate(
     evidence = build_evidence(hits)
     if not evidence:
         return _refuse(query, 0, "no_evidence_in_context")
+    critical = critical_statutory_condition(query, hits)
+    # A truncated evidence window must never activate a rule for an absent source.
+    if critical and f'<source id="{critical[0]}"' not in evidence:
+        critical = None
 
     language = "German" if appears_german(query) else "English"
     user_prompt = (
@@ -215,6 +260,17 @@ def generate(
         "with a source citation like [S1]. Do not add an uncited introduction.\n"
         f"QUESTION:\n{query}\n\n<evidence>\n{evidence}\n</evidence>"
     )
+    if critical:
+        source_id, source_clause = critical
+        user_prompt += (
+            "\nAUDITED SOURCE CONDITION: The following clause appears verbatim "
+            f"in {source_id}: {source_clause}\n"
+            "When answering whether an injunction is available, state the "
+            "future-interference condition explicitly, including its relation "
+            "to the remedy, and cite the quoted source. Do not claim the "
+            "condition is satisfied for any particular person. If you cannot "
+            "state it faithfully, abstain.\n"
+        )
     started = perf_counter()
     attempts = 0
     first_failure = None
@@ -249,6 +305,12 @@ def generate(
                 failure = "model_insufficient_evidence"
             else:
                 validation_error = citation_validation_error(output, evidence)
+                if validation_error is None and critical:
+                    required_id, _ = critical
+                    if required_id not in output.citations:
+                        validation_error = "required_condition_source_not_cited"
+                    elif not FUTURE_INTERFERENCE.search(output.answer):
+                        validation_error = "missing_required_legal_condition"
                 failure = "invalid_citations_or_empty_answer" if validation_error else None
         if failure is None:
             break
