@@ -13,7 +13,10 @@ TEXT = (
     "so kann der Berechtigte von dem anderen Beseitigung der "
     "Beeinträchtigung verlangen. " + CLAUSE
 )
-QUESTION = "Unter welchen Umständen kann jemand wegen der Nutzung seines Namens Unterlassung verlangen?"
+QUESTION = (
+    "Unter welchen Umständen kann jemand wegen der Nutzung seines "
+    "Namens Unterlassung verlangen?"
+)
 
 
 def hit(number="12", passage_text=TEXT):
