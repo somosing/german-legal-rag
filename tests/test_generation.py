@@ -1,6 +1,11 @@
 import json
 
-from legal_rag.generation import abstention, generate
+from legal_rag.generation import (
+    abstention,
+    generate,
+    requested_bgb_sections,
+    scope_explicit_bgb_evidence,
+)
 from legal_rag.models import Hit, Passage
 
 
@@ -122,3 +127,210 @@ def test_german_question_starting_with_wann_uses_german():
     assert appears_german("Wann beginnt die Rechtsfähigkeit?")
     assert abstention("Wann beginnt die Rechtsfähigkeit?").startswith("Die bereitgestellten")
     assert not appears_german("When does legal capacity begin?")
+
+
+def test_uncited_first_sentence_fails_closed():
+    output = response(answer="The waiting period is one year. This follows from law [S1].")
+    answer, sources, metrics = generate("How long?", sample_hits(), MockLLM(output))
+    assert answer == abstention("How long?")
+    assert sources == []
+    assert metrics["abstained"]
+    assert metrics["abstention_reason"] == "invalid_citations_or_empty_answer"
+
+
+def test_cited_factual_sentences_are_allowed():
+    output = response(answer="The waiting period is one year [S1]. It begins at publication [S1].")
+    answer, sources, metrics = generate("How long?", sample_hits(), MockLLM(output))
+    assert answer.count("[S1]") == 2
+    assert len(sources) == 1
+    assert not metrics["abstained"]
+
+
+def test_system_instructs_preservation_of_legal_conditions():
+    from legal_rag.generation import SYSTEM
+
+    assert "qualifying conditions" in SYSTEM
+    assert "Do not conflate different legal remedies" in SYSTEM
+
+
+class SequenceLLM(MockLLM):
+    def __init__(self, answers):
+        self.answers = list(answers)
+        self.calls = 0
+
+    def chat(self, system, user, response_format=None):
+        self.calls += 1
+        assert "<evidence>" in user
+        if self.calls > 1:
+            assert "SECOND-PASS FORMAT REPAIR" in user
+        return self.answers.pop(0)
+
+
+def test_retry_repairs_uncited_first_sentence_without_bypassing_validation():
+    mocked = SequenceLLM([
+        response(answer="The waiting period is one year. The source confirms this [S1]."),
+        response(answer="The waiting period is one year [S1]."),
+    ])
+    answer, sources, metrics = generate(
+        "How long?", sample_hits(), mocked, retry_on_failure=True
+    )
+    assert answer == "The waiting period is one year [S1]."
+    assert sources[0]["source_id"] == "S1"
+    assert metrics["generation_attempts"] == 2
+    assert metrics["first_pass_failure"] == "invalid_citations_or_empty_answer"
+    assert metrics["abstained"] is False
+
+
+def test_retry_never_overrides_model_abstention():
+    mocked = SequenceLLM([
+        response(status="insufficient_evidence", answer="", citations=[]),
+        response(answer="The rule is in the evidence [S1]."),
+    ])
+    answer, sources, metrics = generate(
+        "What is the rule?", sample_hits(), mocked, retry_on_failure=True
+    )
+    assert answer == abstention("What is the rule?")
+    assert sources == []
+    assert metrics["first_pass_failure"] == "model_insufficient_evidence"
+    assert metrics["generation_attempts"] == 1
+    assert metrics["abstained"] is True
+
+
+def test_retry_does_not_force_answer_when_evidence_is_insufficient():
+    refused = response(status="insufficient_evidence", answer="", citations=[])
+    mocked = SequenceLLM([refused, refused])
+    answer, sources, metrics = generate(
+        "Unknown question?", sample_hits(), mocked, retry_on_failure=True
+    )
+    assert answer == abstention("Unknown question?")
+    assert sources == []
+    assert metrics["generation_attempts"] == 1
+    assert metrics["abstention_reason"] == "model_insufficient_evidence"
+    assert metrics["abstained"]
+
+
+def test_unknown_source_id_fails_closed_without_retry():
+    wrong = response(answer="Wrong [S9].", citations=["S9"])
+    answer, sources, metrics = generate(
+        "What?", sample_hits(), SequenceLLM([wrong, wrong]), retry_on_failure=True
+    )
+    assert answer == abstention("What?")
+    assert sources == []
+    assert metrics["generation_attempts"] == 1
+    assert metrics["first_pass_validation_error"] == "unknown_source_id"
+    assert metrics["abstained"]
+
+
+def test_default_generation_does_not_retry():
+    refused = response(status="insufficient_evidence", answer="", citations=[])
+    mocked = SequenceLLM([refused])
+    _, _, metrics = generate("Why?", sample_hits(), mocked)
+    assert mocked.calls == 1
+    assert metrics["generation_attempts"] == 1
+
+
+def test_uncited_first_sentence_reports_diagnostic():
+    output = response(answer="The waiting period is one year. It is in the law [S1].")
+    _, _, metrics = generate("How long?", sample_hits(), MockLLM(output))
+    assert metrics["first_pass_failure"] == "invalid_citations_or_empty_answer"
+    assert metrics["first_pass_validation_error"] == "uncited_sentence"
+    assert metrics["final_validation_error"] == "uncited_sentence"
+
+
+def test_retry_prompt_demands_one_sentence_with_citation():
+    class CaptureRetry(SequenceLLM):
+        def chat(self, system, user, response_format=None):
+            if self.calls:
+                assert "exactly ONE short factual" in user
+                assert "SECOND-PASS FORMAT REPAIR" in user
+            return super().chat(system, user, response_format)
+
+    mocked = CaptureRetry([
+        response(answer="It lasts a year. As documented [S1]."),
+        response(answer="It lasts one year [S1]."),
+    ])
+    answer, _, metrics = generate("How long?", sample_hits(), mocked, retry_on_failure=True)
+    assert answer == "It lasts one year [S1]."
+    assert metrics["generation_attempts"] == 2
+    assert metrics["first_pass_validation_error"] == "uncited_sentence"
+    assert metrics["final_validation_error"] is None
+
+
+def bgb_hit(section_number: str) -> Hit:
+    return Hit(
+        passage=Passage(
+            id=f"p-{section_number}",
+            section_id=f"bgb-{section_number}",
+            law="BGB",
+            title=f"§ {section_number} Example",
+            text="This is statute text.",
+            url=f"https://www.gesetze-im-internet.de/bgb/__{section_number}.html",
+        ),
+        score=0.5,
+        parent_text="This is statute text.",
+    )
+
+
+def test_explicit_bgb_433_must_not_be_answered_with_53():
+    mocked = MockLLM(response(
+        answer="Der Verkäufer muss die Ware liefern [S1]."
+    ))
+    answer, sources, metrics = generate(
+        "Welche Pflichten hat der Verkäufer gemäß § 433 BGB?",
+        [bgb_hit("53")],
+        mocked,
+        retry_on_failure=True,
+    )
+    assert answer == abstention("Welche Pflichten hat der Verkäufer gemäß § 433 BGB?")
+    assert sources == []
+    assert metrics["abstention_reason"] == "requested_bgb_section_not_retrieved"
+    assert metrics["generation_attempts"] == 0
+    assert mocked.calls == 0
+
+
+def test_explicit_section_filters_irrelevant_sources_and_relabels():
+    class Capture(MockLLM):
+        def chat(self, system, user, response_format=None):
+            assert 'url="https://www.gesetze-im-internet.de/bgb/__433.html"' in user
+            assert 'url="https://www.gesetze-im-internet.de/bgb/__53.html"' not in user
+            assert '<source id="S1"' in user
+            return super().chat(system, user, response_format)
+
+    answer, sources, metrics = generate(
+        "Was steht in § 433 BGB?",
+        [bgb_hit("53"), bgb_hit("433")],
+        Capture(response(answer="§ 433 concerns the purchase contract [S1].")),
+    )
+    assert not metrics["abstained"]
+    assert sources[0]["url"].endswith("__433.html")
+    assert len(sources) == 1
+    assert "[S1]" in answer
+
+
+def test_english_section_reference_is_checked():
+    assert requested_bgb_sections("What does section 535 BGB say?") == {"535"}
+    assert scope_explicit_bgb_evidence(
+        "What does section 535 BGB say?", [bgb_hit("53")]
+    ) == []
+
+
+def test_bgb_multiple_references_require_all_sections():
+    assert requested_bgb_sections("Compare §§ 433, 434 BGB") == {"433", "434"}
+    assert scope_explicit_bgb_evidence(
+        "Compare §§ 433, 434 BGB", [bgb_hit("433")]
+    ) == []
+
+
+def test_generic_query_uses_standard_retrieval():
+    assert scope_explicit_bgb_evidence(
+        "Who qualifies as a consumer under the BGB?", [bgb_hit("13")]
+    ) is None
+
+
+def test_only_exact_official_bgb_source_is_accepted():
+    assert scope_explicit_bgb_evidence(
+        "What does § 433 BGB say?", [bgb_hit("43")]
+    ) == []
+    assert scope_explicit_bgb_evidence(
+        "What does § 433 BGB say?", [bgb_hit("433")]
+    ) is not None

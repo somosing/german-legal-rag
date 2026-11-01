@@ -106,6 +106,19 @@ def evaluate_answers(
             and cited_ids == set(listed_ids)
         )
         returned_urls = {str(source["url"]) for source in response["sources"]}
+        # Private benchmark report contains the actual passages returned to the
+        # model plus available parent context for independent human review.
+        # Generated reports are gitignored; do not use sensitive source data.
+        cited_sources = []
+        for source in response["sources"]:
+            parent = service.retriever.parents.get(source.get("section_id"))
+            cited_sources.append({
+                "source_id": source["source_id"],
+                "url": source["url"],
+                "title": source.get("title", ""),
+                "passage": str(source.get("passage", ""))[:1050],
+                "parent_excerpt": parent.text[:1450] if parent else "",
+            })
         gold_cited = bool(returned_urls & set(sample.get("gold_section_urls", [])))
         status_correct = actual_status == sample["expected_status"]
         observed_language = observed_answer_language(response["answer"])
@@ -130,8 +143,13 @@ def evaluate_answers(
                 "observed_answer_language": observed_language,
                 "language_match_heuristic": language_match,
                 "returned_source_urls": sorted(returned_urls),
+                "cited_sources": cited_sources,
                 "answer": response["answer"],
                 "abstention_reason": metrics.get("abstention_reason"),
+                "generation_attempts": metrics.get("generation_attempts", 1),
+                "first_pass_failure": metrics.get("first_pass_failure"),
+                "first_pass_validation_error": metrics.get("first_pass_validation_error"),
+                "final_validation_error": metrics.get("final_validation_error"),
                 "total_ms": float(metrics["total_ms"]),
             }
         )
@@ -228,6 +246,11 @@ def evaluate_answers(
                 f"- Expected/actual: `{row['expected_status']}` / `{row['actual_status']}`",
                 f"- Citation labels consistent: `{row['citation_consistent']}`",
                 f"- Gold section cited: `{row['gold_section_cited']}`",
+                f"- Generation attempts: `{row['generation_attempts']}`",
+                f"- First-pass failure: `{row['first_pass_failure']}`",
+                f"- First-pass validation detail: `{row['first_pass_validation_error']}`",
+                f"- Final validation detail: `{row['final_validation_error']}`",
+                f"- Final abstention reason: `{row['abstention_reason']}`",
                 f"- Observed language (heuristic): `{row['observed_answer_language']}`",
                 f"- Language matches question (heuristic): `{row['language_match_heuristic']}`",
                 f"- Returned URLs: {', '.join(row['returned_source_urls']) or '(none)'}",

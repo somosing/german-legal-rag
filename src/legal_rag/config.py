@@ -25,6 +25,7 @@ class Settings:
     rerank_model: str
     candidates: int
     final_k: int
+    retry_on_failure: bool = False
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -38,4 +39,6 @@ class Settings:
             rerank_model=os.getenv("RAG_RERANK_MODEL", "BAAI/bge-reranker-v2-m3"),
             candidates=_env_int("RAG_CANDIDATES", 20),
             final_k=_env_int("RAG_FINAL_K", 4),
+            retry_on_failure=os.getenv("RAG_RETRY_ON_FAILURE", "false").lower()
+            in {"1", "true", "yes"},
         )
