@@ -72,3 +72,27 @@ collisions and prevents answering GDPR Article 15 from BGB §79a. When
 a question names multiple laws, the guard requires evidence from each.
 It does not prove claim support or resolve every implicit statute reference,
 nickname, cross-reference, or other unrecognized legislation.
+
+## Retrieval-versus-generation diagnosis
+
+Recent versions of `eval-answers` add a benchmark-only trace of the
+**actual retrieval candidates** for each query, including ones that later
+abstain and emit no citations. This uses the same retrieval call that
+fed answer generation, not a second potentially different query.
+
+In `answer_report.md`, inspect the gold-section retrieved rank and
+candidate URLs for failed positive cases such as §12 and §51. The JSON
+also includes title, law metadata, and a short passage excerpt for
+each candidate. The trace represents **pre-filter retrieval hits**,
+not necessarily the evidence passed into Ollama after statute
+scoping and context-window limits.
+
+If the gold source is absent, investigate retrieval. If it is
+present but the model abstained, inspect the generation contract,
+evidence completeness, and any validation error separately. Never
+interpret structural citations as factual entailment.
+
+The trace can contain private retrieved text in future datasets,
+so these reports are local-only, gitignored, and must not be shared
+unredacted for sensitive corpora. The ordinary `ask`/API path does
+**not** expose the retrieval trace.
