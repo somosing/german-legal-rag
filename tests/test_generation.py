@@ -245,7 +245,7 @@ def test_retry_prompt_demands_one_sentence_with_citation():
     class CaptureRetry(SequenceLLM):
         def chat(self, system, user, response_format=None):
             if self.calls:
-                assert "with a valid citation [S#]" in user
+                assert "exactly ONE complete factual" in user
                 assert "SECOND-PASS FORMAT REPAIR" in user
             return super().chat(system, user, response_format)
 
