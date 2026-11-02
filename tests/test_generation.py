@@ -2,6 +2,7 @@ import json
 
 from legal_rag.generation import (
     abstention,
+    answer_shape_instruction,
     generate,
     requested_bgb_sections,
     scope_explicit_bgb_evidence,
@@ -162,7 +163,10 @@ class SequenceLLM(MockLLM):
         self.calls += 1
         assert "<evidence>" in user
         if self.calls > 1:
-            assert "SECOND-PASS FORMAT REPAIR" in user
+            assert (
+                "SECOND-PASS FORMAT REPAIR" in user
+                or "SECOND-PASS SOURCE CONDITION REPAIR" in user
+            )
         return self.answers.pop(0)
 
 
@@ -241,7 +245,7 @@ def test_retry_prompt_demands_one_sentence_with_citation():
     class CaptureRetry(SequenceLLM):
         def chat(self, system, user, response_format=None):
             if self.calls:
-                assert "exactly ONE short factual" in user
+                assert "with a valid citation [S#]" in user
                 assert "SECOND-PASS FORMAT REPAIR" in user
             return super().chat(system, user, response_format)
 
@@ -334,3 +338,71 @@ def test_only_exact_official_bgb_source_is_accepted():
     assert scope_explicit_bgb_evidence(
         "What does § 433 BGB say?", [bgb_hit("433")]
     ) is not None
+
+def test_enumerative_question_prompt_covers_all_distinct_duties():
+    instruction = answer_shape_instruction("Welche Pflichten hat der Verkäufer?")
+    assert "EACH distinct relevant" in instruction
+    assert "without mixing duties" in instruction
+    assert "only one example" in instruction
+
+
+def test_conditional_question_prompt_mentions_all_prerequisites():
+    instruction = answer_shape_instruction(
+        "Unter welchen Umständen kann man Unterlassung verlangen?"
+    )
+    assert "EVERY relevant factual prerequisite" in instruction
+
+
+def test_simple_questions_remain_concise():
+    assert answer_shape_instruction("What is legal adulthood?") == ""
+
+
+def test_prompt_for_seller_obligations_is_evidence_first():
+    class Capture(MockLLM):
+        def chat(self, system, user, response_format=None):
+            assert "COVERAGE CHECK" in user
+            assert "EACH distinct relevant requirement" in user
+            assert "for a multi-part question, cover all relevant parts" in user
+            return super().chat(system, user, response_format)
+
+    answer, _, _ = generate(
+        "Welche Pflichten hat der Verkäufer?", sample_hits(), Capture(response())
+    )
+    assert answer
+
+
+def test_condition_repair_requires_source_wording():
+    from legal_rag.generation import BGB12_INJUNCTION_CLAUSE
+    from legal_rag.models import Hit, Passage
+
+    source = Hit(
+        Passage(
+            "p12", "s12", "BGB", "§ 12 Namensrecht",
+            BGB12_INJUNCTION_CLAUSE,
+            "https://www.gesetze-im-internet.de/bgb/__12.html",
+        ),
+        1.0,
+        BGB12_INJUNCTION_CLAUSE,
+    )
+
+    class Capture(SequenceLLM):
+        def chat(self, system, user, response_format=None):
+            if self.calls:
+                assert "SECOND-PASS SOURCE CONDITION REPAIR" in user
+                assert BGB12_INJUNCTION_CLAUSE in user
+                assert "State the qualification explicitly" in user
+            return super().chat(system, user, response_format)
+
+    mocked = Capture([
+        response(answer="Unbefugter Namensgebrauch erlaubt Unterlassung [S1]."),
+        response(
+            answer="Unterlassung ist möglich, wenn weitere Beeinträchtigungen "
+            "zu besorgen sind [S1]."
+        ),
+    ])
+    answer, _, metrics = generate(
+        "Unter welchen Umständen kann jemand Unterlassung verlangen?",
+        [source], mocked, retry_on_failure=True,
+    )
+    assert "weitere Beeinträchtigungen" in answer
+    assert metrics["generation_attempts"] == 2

@@ -96,3 +96,20 @@ The trace can contain private retrieved text in future datasets,
 so these reports are local-only, gitignored, and must not be shared
 unredacted for sensitive corpora. The ordinary `ask`/API path does
 **not** expose the retrieval trace.
+
+## Coverage-oriented prompt experiment
+
+Generation now differentiates concise one-fact questions from open-ended
+requests for obligations/requirements and conditional legal remedies.
+Enumerative questions explicitly request each relevant source-grounded
+requirement (without mixing parties), rather than compressing the first
+obligation into a one-sentence answer. On validation failure, a narrowly
+audited §12 prerequisite retry highlights the actual source wording instead
+of repeating the generic shortest-answer directive.
+
+This is a **prompt-only behavior experiment**, not automatic coverage or
+entailment verification. Local Qwen responses may still omit duties or
+abstain. Compare the same 22-case dataset, source snapshot, model, and
+retrieval mode to the v3 results, paying particular attention to §433 and
+§12 and retaining all six negative abstentions. Do not reinterpret a lexical
+concept match as semantic correctness.
