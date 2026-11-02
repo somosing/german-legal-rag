@@ -233,22 +233,43 @@ def abstention(query: str) -> str:
 
 
 def build_evidence(hits: list[Hit], cap: int = 9000) -> str:
+    """Pack source-labelled evidence under a hard character budget.
+
+    Normal top-four retrieval keeps the original rich parent/child context.
+    More-than-four-hit retrieval (currently the neighbor experiment) shares
+    the budget among candidates, so a later citation is not always starved
+    by earlier long sections. This is a character, not token, budget.
+    """
     blocks: list[str] = []
     total = 0
+    balanced = len(hits) > 4
+    # Account for the two newline characters between rendered blocks.
+    share = (cap - 2 * (len(hits) - 1)) // len(hits) if hits else 0
+
     for i, hit in enumerate(hits, start=1):
-        # Parent is context and child is evidence. Keep section ID and URL visible.
-        parent = hit.parent_text[:1450]
-        child = hit.passage.text[:1050]
-        block = (
+        header = (
             f'<source id="S{i}" title="{hit.passage.title}" '
-            f'url="{hit.passage.url}">\n'
-            f"RELEVANT PASSAGE:\n{child}\n"
-            f"PARENT SECTION CONTEXT:\n{parent}\n</source>"
+            f'url="{hit.passage.url}">\nRELEVANT PASSAGE:\n'
         )
-        if total + len(block) > cap:
+        middle = "\nPARENT SECTION CONTEXT:\n"
+        footer = "\n</source>"
+        if balanced and share > len(header + middle + footer) + 120:
+            # Prefer the child (original matched chunk). Preserve some of
+            # the parent context, but never generate or attribute new text.
+            allowance = share - len(header + middle + footer)
+            child_limit = min(len(hit.passage.text), (allowance * 4) // 5)
+            child = hit.passage.text[:child_limit]
+            parent = hit.parent_text[:allowance - len(child)]
+        else:
+            # Preserve the established top-four behavior exactly.
+            child = hit.passage.text[:1050]
+            parent = hit.parent_text[:1450]
+        block = header + child + middle + parent + footer
+        separator = 2 if blocks else 0
+        if total + separator + len(block) > cap:
             break
         blocks.append(block)
-        total += len(block)
+        total += separator + len(block)
     return "\n\n".join(blocks)
 
 
