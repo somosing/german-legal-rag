@@ -25,11 +25,15 @@ def test_service_trace_is_only_available_for_benchmark(monkeypatch):
 
     retriever = StubRetriever()
     service = RAGService.__new__(RAGService)
-    service.settings = SimpleNamespace(retry_on_failure=False, llm_model="fake")
+    service.settings = SimpleNamespace(
+        retry_on_failure=False, structured_claim_repair=False, llm_model="fake"
+    )
     service.retriever = retriever
     service.model = object()
 
-    def fake_generate(query, hits, model, *, retry_on_failure=False):
+    def fake_generate(
+        query, hits, model, *, retry_on_failure=False, structured_claim_repair=False
+    ):
         assert hits == [hit]
         return (
             "No evidence found.",
