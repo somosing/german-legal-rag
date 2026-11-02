@@ -105,4 +105,11 @@ When ready to rebuild the index (this replaces the 100-section index and could t
 uv run legal-rag ingest --source bgb
 ```
 
+The chunker keeps ordinary paragraphs together but splits very long ones into
+bounded passages (default: 750 text characters). It prefers sentence or word
+boundaries, preserves the statutory source URL/section identity and keeps the
+original paragraph text in order. A long unbroken token may require a hard
+character cut. Bounded text length reduces model-context errors but does not
+guarantee that every tokenizer/model combination will fit.
+
 Check `state/manifest.json` for section count, source fingerprint and model. Important limitations: the parser does not fully preserve complex statutory tables/footnotes, indexing is not atomic across all local stores, and there is no version-aware statutory effective-date handling yet. Benchmarks must be regenerated and relabelled for the expanded corpus.
