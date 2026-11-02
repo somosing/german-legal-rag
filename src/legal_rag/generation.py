@@ -34,6 +34,45 @@ BGB_SECTION_WORD = re.compile(
 )
 
 
+# The source's law identity must match the law explicitly requested by the
+# question. The textual body of a BGB paragraph is never evidence for a
+# similarly numbered StGB/ZPO provision.
+LAW_TOKEN = re.compile(
+    r"\b(?:BGB|StGB|ZPO|ArbZG|EStG|UStG|GDPR|DSGVO|DS-GVO)\b",
+    re.IGNORECASE,
+)
+LAW_ALIASES = {"dsgvo": "gdpr", "ds-gvo": "gdpr"}
+
+
+def canonical_law(label: str) -> str:
+    identifier = label.casefold()
+    return LAW_ALIASES.get(identifier, identifier)
+
+
+def requested_laws(query: str) -> set[str]:
+    """Recognize named statutes explicitly mentioned in the query."""
+    return {canonical_law(m.group()) for m in LAW_TOKEN.finditer(query)}
+
+
+def scope_explicit_law_evidence(query: str, hits: list[Hit]) -> list[Hit] | None:
+    """Reject missing law identities before asking the LLM to generate.
+
+    None: no recognized named law. []: requested law absent. A list:
+    citations must come from passages with law identities requested in the
+    question. This prevents collisions such as StGB §242 vs BGB §242.
+    Cross-law questions require retrieved evidence from every named law.
+    The allowlist is intentionally limited to supported statute names.
+    """
+    required = requested_laws(query)
+    if not required:
+        return None
+    matching = [
+        hit for hit in hits if canonical_law(hit.passage.law) in required
+    ]
+    present = {canonical_law(hit.passage.law) for hit in matching}
+    return matching if required.issubset(present) else []
+
+
 def requested_bgb_sections(query: str) -> set[str]:
     """Extract explicitly numbered BGB sections, not inferred legal references."""
     if re.search(r"\bBGB\b", query, flags=re.IGNORECASE) is None:
@@ -234,6 +273,16 @@ def generate(
     """
     if not hits:
         return _refuse(query, 0, "no_retrieval_hits")
+    by_law = scope_explicit_law_evidence(query, hits)
+    if by_law is not None:
+        if not by_law:
+            answer, sources, metrics = _refuse(
+                query, 0, "requested_law_not_retrieved"
+            )
+            metrics["generation_attempts"] = 0
+            return answer, sources, metrics
+        # Renumber labels from the filtered hits when building evidence.
+        hits = by_law
     scoped = scope_explicit_bgb_evidence(query, hits)
     if scoped is not None:
         if not scoped:

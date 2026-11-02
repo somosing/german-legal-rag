@@ -58,3 +58,17 @@ Review the per-question report and run a claim-support audit. Record
 provenance and uncertain labels. For a fair comparison, retain the
 source snapshot, dataset version, embedding model, retrieval mode,
 generation model, and decoding settings.
+
+## Explicit statute identity guard
+
+The generation step now checks named law identifiers in the query before it
+constructs cited evidence. Recognized names: BGB, StGB, ZPO, ArbZG, EStG,
+UStG, GDPR/DSGVO. The retrieved passage's `law` metadata, **not its
+body or section number alone**, must match all named laws; otherwise the
+system abstains (`requested_law_not_retrieved`) without calling Ollama.
+
+This avoids the observed BGB §242 → StGB §242 and BGB §253 → ZPO §253
+collisions and prevents answering GDPR Article 15 from BGB §79a. When
+a question names multiple laws, the guard requires evidence from each.
+It does not prove claim support or resolve every implicit statute reference,
+nickname, cross-reference, or other unrecognized legislation.
