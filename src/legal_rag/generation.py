@@ -168,9 +168,12 @@ Return a JSON object conforming to the specified schema with exactly:
 - citations: unique source IDs used in the answer, e.g. ["S1"], or [] if insufficient.
 If sources do not support the requested fact, status MUST be "insufficient_evidence".
 Never mark a refusal to answer as "answered", even if it cites source labels.
-For simple, directly answerable questions, prefer exactly ONE concise factual sentence
-ending with a source citation [S1]. For more complex answers, place a source
-citation at the end of EVERY factual sentence. Never cite only a later sentence
+For simple, directly answerable questions, prefer one concise factual sentence
+ending with a source citation [S1]. For questions asking for multiple duties,
+requirements or conditions, cover ALL distinct relevant points in the evidence
+instead of giving only one example; use multiple cited sentences when necessary.
+For more complex answers, place a source citation at the end of EVERY factual
+sentence. Never cite only a later sentence
 when an earlier sentence makes a factual claim. Do not repeat the same fact.
 Preserve all qualifying conditions, exceptions, and requirements in the cited
 source. Do not conflate different legal remedies or omit preconditions.
@@ -188,6 +191,41 @@ def appears_german(query: str) -> bool:
         r"ist|sind|kann|muss|darf|gilt|nach|ab|unter|warum|wieviel)\b"
     )
     return bool(re.search(german_words, query.casefold()))
+
+
+ENUMERATION_QUERY = re.compile(
+    r"\b(?:pflichten|voraussetzungen|anforderungen|ansprüche|"
+    r"obligations|duties|requirements|prerequisites|criteria)\b",
+    re.IGNORECASE,
+)
+CONDITIONAL_QUERY = re.compile(
+    r"unter\s+welchen\s+umständen|unter\s+welchen\s+bedingungen|"
+    r"under\s+what\s+circumstances|under\s+what\s+conditions|"
+    r"\b(?:wann|when)\s+(?:kann|can)\b",
+    re.IGNORECASE,
+)
+
+
+def answer_shape_instruction(query: str) -> str:
+    """Give a generic answer-coverage hint, never a fixture-specific legal rule."""
+    if ENUMERATION_QUERY.search(query):
+        return (
+            "COVERAGE CHECK: The question asks for duties, conditions, or "
+            "requirements. Before answering, identify EACH distinct relevant "
+            "requirement in the cited evidence, including different clauses of "
+            "the same subsection. Cover them all, without mixing duties of "
+            "different parties. A short semicolon-separated sentence or several "
+            "fully cited sentences are acceptable. Do not give only one example. "
+            "If the evidence is incomplete, abstain.\n"
+        )
+    if CONDITIONAL_QUERY.search(query):
+        return (
+            "CONDITION CHECK: The question asks when a remedy or consequence "
+            "applies. Preserve EVERY relevant factual prerequisite, qualification "
+            "and exception from the cited evidence; do not confuse remedies. "
+            "If the evidence is incomplete, abstain.\n"
+        )
+    return ""
 
 
 def abstention(query: str) -> str:
@@ -305,8 +343,10 @@ def generate(
     user_prompt = (
         f"REQUIRED_ANSWER_LANGUAGE: {language}\n"
         f"Write all explanations in {language}; keep statutory titles and citations unchanged.\n"
-        "For a short direct question, give ONE short factual sentence ending "
-        "with a source citation like [S1]. Do not add an uncited introduction.\n"
+        "For a simple direct question, provide a concise cited answer; "
+        "for a multi-part question, cover all relevant parts. "
+        "Do not add an uncited introduction.\n"
+        f"{answer_shape_instruction(query)}"
         f"QUESTION:\n{query}\n\n<evidence>\n{evidence}\n</evidence>"
     )
     if critical:
@@ -314,9 +354,10 @@ def generate(
         user_prompt += (
             "\nAUDITED SOURCE CONDITION: The following clause appears verbatim "
             f"in {source_id}: {source_clause}\n"
-            "When answering whether an injunction is available, state the "
-            "future-interference condition explicitly, including its relation "
-            "to the remedy, and cite the quoted source. Do not claim the "
+            "When answering whether an injunction is available, explicitly "
+            "include the legal prerequisite using the source's own wording "
+            "and explain its relation to the remedy. Cite this source. "
+            "Do not claim the "
             "condition is satisfied for any particular person. If you cannot "
             "state it faithfully, abstain.\n"
         )
@@ -331,15 +372,27 @@ def generate(
         attempts += 1
         instruction = user_prompt
         if attempt:
-            instruction += (
-                "\n\nSECOND-PASS FORMAT REPAIR: The first attempt failed structural "
-                f"validation ({first_validation_error or first_failure}). "
-                "Using only the SAME evidence, write exactly ONE short factual "
-                "sentence ending with a valid [S#] citation. Put that ID in the "
-                "citations array. Include all legally necessary conditions. "
-                "If evidence does not justify the sentence, return insufficient_evidence. "
-                "Do not invent facts or citations."
-            )
+            if first_validation_error == "missing_required_legal_condition" and critical:
+                required_id, required_clause = critical
+                instruction += (
+                    "\n\nSECOND-PASS SOURCE CONDITION REPAIR: The first answer "
+                    "omitted a legally required qualification. The evidence contains "
+                    f"this exact clause under {required_id}: {required_clause}\n"
+                    "State the qualification explicitly using the source's wording "
+                    "and cite that exact source. Include the underlying name-rights "
+                    "interference when supported. Do not claim the condition is "
+                    "satisfied in a real case. If evidence is insufficient, abstain."
+                )
+            else:
+                instruction += (
+                    "\n\nSECOND-PASS FORMAT REPAIR: The first attempt failed "
+                    f"validation ({first_validation_error or first_failure}). "
+                    "Using only the SAME evidence, write a concise factual answer "
+                    "with a valid citation [S#] for each factual sentence. "
+                    "Cover all relevant duties and prerequisites when requested. "
+                    "If evidence does not justify the answer, return "
+                    "insufficient_evidence. Do not invent facts or citations."
+                )
         raw = model.chat(
             SYSTEM, instruction, response_format=StructuredAnswer.model_json_schema()
         )
