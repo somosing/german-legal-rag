@@ -113,3 +113,24 @@ abstain. Compare the same 22-case dataset, source snapshot, model, and
 retrieval mode to the v3 results, paying particular attention to §433 and
 §12 and retaining all six negative abstentions. Do not reinterpret a lexical
 concept match as semantic correctness.
+
+## Experimental forward-neighbor retrieval (not baseline)
+
+The opt-in `dense_neighbors` mode starts from the standard dense top four
+sections and includes **up to two following sections in XML source order**
+after each seed. This makes §51 BGB discoverable from a retrieved §50 BGB,
+despite intervening §50a. The neighboring sections keep their own section
+URLs and citation labels, and no existing index is rebuilt.
+
+This is an **ablation**, not a recommended default. Adjacent provisions can
+be irrelevant; the current generator may drop later hits at the 9,000-character
+evidence cap. Compare retrieval trace and exact answer quality and do not
+interpret a higher section-recall score as legal correctness.
+
+```bash
+export RAG_STATE_DIR="$HOME/rag-indices/bgb-full"
+uv run legal-rag ask "How long is the waiting period for distributing the property of a dissolved association?" --mode dense_neighbors
+RAG_RETRY_ON_FAILURE=true uv run legal-rag eval-answers \
+  --gold examples/bgb_full_answer_questions.json \
+  --output reports/bgb_full_dense_neighbors_v1 --mode dense_neighbors
+```

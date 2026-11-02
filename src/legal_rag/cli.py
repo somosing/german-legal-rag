@@ -34,7 +34,7 @@ def main() -> None:
     ask = sub.add_parser("ask", help="Ask a question in German or English")
     ask.add_argument("query", type=str)
     ask.add_argument(
-        "--mode", choices=["bm25", "dense", "hybrid", "hybrid_dense3"], default="dense"
+        "--mode", choices=["bm25", "dense", "hybrid", "hybrid_dense3", "dense_neighbors"], default="dense"
     )
 
     evaluate = sub.add_parser("eval", help="Compare four retriever modes")
@@ -49,7 +49,7 @@ def main() -> None:
     )
     answer_eval.add_argument("--output", type=Path, default=Path("reports/bgb_answers"))
     answer_eval.add_argument(
-        "--mode", choices=["bm25", "dense", "hybrid", "hybrid_dense3"], default="dense"
+        "--mode", choices=["bm25", "dense", "hybrid", "hybrid_dense3", "dense_neighbors"], default="dense"
     )
 
     audit_export = sub.add_parser(
