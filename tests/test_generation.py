@@ -163,7 +163,10 @@ class SequenceLLM(MockLLM):
         self.calls += 1
         assert "<evidence>" in user
         if self.calls > 1:
-            assert "SECOND-PASS FORMAT REPAIR" in user
+            assert (
+                "SECOND-PASS FORMAT REPAIR" in user
+                or "SECOND-PASS SOURCE CONDITION REPAIR" in user
+            )
         return self.answers.pop(0)
 
 
