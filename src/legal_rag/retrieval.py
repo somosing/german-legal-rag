@@ -50,6 +50,14 @@ class Retriever:
         self.passages, self.parents = index.load()
         from rank_bm25 import BM25Okapi
         self.lookup: dict[str, Passage] = {p.id: p for p in self.passages}
+        # Use source order: § 50a appears between § 50 and § 51.
+        self.ordered_section_ids = list(self.parents)
+        self.section_position = {
+            sid: i for i, sid in enumerate(self.ordered_section_ids)
+        }
+        self.first_child: dict[str, Passage] = {}
+        for passage in self.passages:
+            self.first_child.setdefault(passage.section_id, passage)
         if not self.passages:
             raise ValueError("Empty index")
         self.bm25 = BM25Okapi([tokenize(p.title + " " + p.text) for p in self.passages])
@@ -84,12 +92,49 @@ class Retriever:
             client.close()
         return [str(point.payload["id"]) for point in result.points if point.payload]
 
+    def _expand_following_sections(
+        self, hits: list[Hit], *, forward: int = 2
+    ) -> list[Hit]:
+        """Experimental section-neighbor retrieval; preserve source citations.
+
+        Neighbors are source-order sections, not number arithmetic. Keep
+        originals unchanged; append only same-law sections with full text.
+        """
+        seen = {hit.passage.section_id for hit in hits}
+        expanded: list[Hit] = []
+        for hit in hits:
+            expanded.append(hit)
+            position = self.section_position.get(hit.passage.section_id)
+            if position is None:
+                continue
+            for step in range(1, forward + 1):
+                candidate_position = position + step
+                if candidate_position >= len(self.ordered_section_ids):
+                    break
+                section_id = self.ordered_section_ids[candidate_position]
+                section = self.parents[section_id]
+                if (
+                    section.law != hit.passage.law
+                    or section_id in seen
+                    or section_id not in self.first_child
+                ):
+                    continue
+                seen.add(section_id)
+                expanded.append(Hit(
+                    passage=self.first_child[section_id],
+                    score=0.0,
+                    parent_text=section.text,
+                ))
+        return expanded
+
     def search(self, query: str, mode: str = "hybrid") -> tuple[list[Hit], dict]:
-        if mode not in {"bm25", "dense", "hybrid", "hybrid_dense3"}:
-            raise ValueError("mode must be bm25, dense, hybrid, or hybrid_dense3")
+        if mode not in {"bm25", "dense", "hybrid", "hybrid_dense3", "dense_neighbors"}:
+            raise ValueError(
+                "mode must be bm25, dense, hybrid, hybrid_dense3, or dense_neighbors"
+            )
         start = perf_counter()
         limit = self.index.settings.candidates
-        bm25_ids = self._bm25(query, limit) if mode != "dense" else []
+        bm25_ids = self._bm25(query, limit) if mode not in {"dense", "dense_neighbors"} else []
         dense_ids = self._dense(query, limit) if mode != "bm25" else []
         # Controlled ablation: dense receives 3x BM25 weight in experimental mode.
         # Do not overwrite the original equal-weight hybrid baseline.
@@ -124,8 +169,12 @@ class Retriever:
                 results.append(hit)
             if len(results) >= self.index.settings.final_k:
                 break
+        base_hit_count = len(results)
+        if mode == "dense_neighbors":
+            results = self._expand_following_sections(results)
         timing = {
             "retrieval_ms": round((perf_counter() - start) * 1000, 2),
+            "neighbor_expansion_count": len(results) - base_hit_count,
             "mode": mode,
             "reranked": self.reranker is not None and mode in {"hybrid", "hybrid_dense3"},
             "bm25_candidates": len(bm25_ids),
