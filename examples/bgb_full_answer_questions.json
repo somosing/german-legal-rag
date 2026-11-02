@@ -1,0 +1,222 @@
+[
+  {
+    "question": "Wann beginnt die Rechtsfähigkeit eines Menschen?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__1.html"
+    ]
+  },
+  {
+    "question": "At what age does someone attain legal adulthood under the BGB?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__2.html"
+    ]
+  },
+  {
+    "question": "Unter welchen Umständen kann jemand wegen der Nutzung seines Namens Unterlassung verlangen?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__12.html"
+    ],
+    "required_answer_concepts": [
+      {
+        "id": "future_interference_condition",
+        "any_of": [
+          "weitere Beeinträchtigungen",
+          "weitere Beeinträchtigung",
+          "Wiederholungsgefahr",
+          "erneute Beeinträchtigungen",
+          "erneute Beeinträchtigung",
+          "künftige Beeinträchtigungen",
+          "künftige Beeinträchtigung",
+          "zukünftige Beeinträchtigungen",
+          "zukünftige Beeinträchtigung"
+        ]
+      }
+    ]
+  },
+  {
+    "question": "Who qualifies as a consumer under the BGB?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__13.html"
+    ]
+  },
+  {
+    "question": "Wer gilt nach dem BGB als Unternehmer?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__14.html"
+    ]
+  },
+  {
+    "question": "How long is the waiting period for distributing the property of a dissolved association?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__51.html"
+    ]
+  },
+  {
+    "question": "Welche Pflichten hat der Verkäufer gemäß § 433 BGB?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__433.html"
+    ],
+    "required_answer_concepts": [
+      {
+        "id": "seller_handover",
+        "any_of": [
+          "übergeben",
+          "Übergabe",
+          "auszuhändigen"
+        ]
+      },
+      {
+        "id": "seller_ownership_transfer",
+        "any_of": [
+          "Eigentum",
+          "übereign",
+          "Eigentumsübertragung"
+        ]
+      },
+      {
+        "id": "seller_free_of_material_and_title_defects",
+        "any_of": [
+          "Sach- und Rechtsmängeln",
+          "Sach- und Rechtsmängel",
+          "Sachmängeln und Rechtsmängeln",
+          "Sachmängel und Rechtsmängel",
+          "Sach- und Rechtsmangelfreiheit"
+        ]
+      }
+    ]
+  },
+  {
+    "question": "What obligations does a landlord have under section 535 BGB?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__535.html"
+    ]
+  },
+  {
+    "question": "Welche Voraussetzungen für Schadensersatz stehen in § 280 BGB?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__280.html"
+    ]
+  },
+  {
+    "question": "What does section 823 BGB say about liability for damages?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__823.html"
+    ]
+  },
+  {
+    "question": "Was regelt § 985 BGB zum Herausgabeanspruch?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__985.html"
+    ]
+  },
+  {
+    "question": "What does section 611a BGB require in an employment contract?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__611a.html"
+    ]
+  },
+  {
+    "question": "Wer vertritt einen Verein gerichtlich und außergerichtlich?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__26.html"
+    ]
+  },
+  {
+    "question": "Who appoints the board of an association under the BGB?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__27.html"
+    ]
+  },
+  {
+    "question": "Unter welchen Bedingungen kann einem Verein die verliehene Rechtsfähigkeit entzogen werden?",
+    "language": "de",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__43.html"
+    ]
+  },
+  {
+    "question": "Do state laws governing church foundations remain applicable under the BGB?",
+    "language": "en",
+    "expected_status": "answered",
+    "gold_section_urls": [
+      "https://www.gesetze-im-internet.de/bgb/__88.html"
+    ]
+  },
+  {
+    "question": "Welche Strafe droht für Diebstahl nach § 242 StGB?",
+    "language": "de",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/stgb/__242.html"
+    ]
+  },
+  {
+    "question": "What information must be provided under Article 15 GDPR?",
+    "language": "en",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://eur-lex.europa.eu/eli/reg/2016/679/oj"
+    ]
+  },
+  {
+    "question": "Welche Anforderungen stellt § 253 ZPO an eine Klageschrift?",
+    "language": "de",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/zpo/__253.html"
+    ]
+  },
+  {
+    "question": "What daily working-time limit does section 3 ArbZG establish?",
+    "language": "en",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/arbzg/__3.html"
+    ]
+  },
+  {
+    "question": "Wer ist nach § 1 EStG unbeschränkt einkommensteuerpflichtig?",
+    "language": "de",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/estg/__1.html"
+    ]
+  },
+  {
+    "question": "What does section 19 UStG provide for small businesses?",
+    "language": "en",
+    "expected_status": "insufficient_evidence",
+    "absent_section_urls": [
+      "https://www.gesetze-im-internet.de/ustg_1980/__19.html"
+    ]
+  }
+]
