@@ -19,6 +19,13 @@ class RAGService:
         self.retriever = Retriever(self.index)
 
     def ask(self, query: str, mode: str = "dense") -> dict:
+        return self._answer(query, mode, include_retrieval_trace=False)
+
+    def ask_for_evaluation(self, query: str, mode: str = "dense") -> dict:
+        """Keep the actual pre-generation hits in a local benchmark report only."""
+        return self._answer(query, mode, include_retrieval_trace=True)
+
+    def _answer(self, query: str, mode: str, *, include_retrieval_trace: bool) -> dict:
         if not query.strip() or len(query) > 800:
             raise ValueError("Query must contain 1 to 800 characters")
         start = perf_counter()
@@ -26,7 +33,7 @@ class RAGService:
         answer, sources, generation = generate(
             query, hits, self.model, retry_on_failure=self.settings.retry_on_failure
         )
-        return {
+        result = {
             "answer": answer,
             "sources": sources,
             "metrics": {
@@ -37,3 +44,16 @@ class RAGService:
             "model": self.settings.llm_model,
             "disclaimer": "Research aid only; not legal advice. Verify current official law.",
         }
+        if include_retrieval_trace:
+            result["retrieval_candidates"] = [
+                {
+                    "rank": rank,
+                    "law": hit.passage.law,
+                    "section_id": hit.passage.section_id,
+                    "url": hit.passage.url,
+                    "title": hit.passage.title,
+                    "passage_excerpt": hit.passage.text[:850],
+                }
+                for rank, hit in enumerate(hits, start=1)
+            ]
+        return result

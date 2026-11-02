@@ -129,7 +129,14 @@ def evaluate_answers(
     )
     rows = []
     for sample in samples:
-        response = service.ask(sample["question"], mode=mode)
+        # Optional evaluation-only method captures the same retrieval that fed
+        # generation, avoiding a misleading second retrieval call after failure.
+        evaluate_one = getattr(service, "ask_for_evaluation", None)
+        response = (
+            evaluate_one(sample["question"], mode=mode)
+            if callable(evaluate_one)
+            else service.ask(sample["question"], mode=mode)
+        )
         metrics = response["metrics"]
         abstained = metrics["abstained"]
         actual_status = "insufficient_evidence" if abstained else "answered"
@@ -156,6 +163,19 @@ def evaluate_answers(
                 "parent_excerpt": parent.text[:1450] if parent else "",
             })
         gold_cited = bool(returned_urls & set(sample.get("gold_section_urls", [])))
+        retrieved_candidates = response.get("retrieval_candidates")
+        gold_rank = (
+            next(
+                (
+                    hit["rank"]
+                    for hit in retrieved_candidates
+                    if hit["url"] in sample.get("gold_section_urls", [])
+                ),
+                None,
+            )
+            if retrieved_candidates is not None
+            else None
+        )
         condition_checks = _required_condition_checks(
             response["answer"], sample.get("required_answer_concepts", [])
         )
@@ -187,6 +207,8 @@ def evaluate_answers(
                 "language_match_heuristic": language_match,
                 "returned_source_urls": sorted(returned_urls),
                 "cited_sources": cited_sources,
+                "retrieval_candidates": retrieved_candidates,
+                "retrieval_gold_rank": gold_rank,
                 "answer": response["answer"],
                 "abstention_reason": metrics.get("abstention_reason"),
                 "generation_attempts": metrics.get("generation_attempts", 1),
@@ -200,6 +222,9 @@ def evaluate_answers(
     positives = [r for r in rows if r["expected_status"] == "answered"]
     negatives = [r for r in rows if r["expected_status"] == "insufficient_evidence"]
     durations = [r["total_ms"] for r in rows]
+    traced_positives = [
+        r for r in positives if r["retrieval_candidates"] is not None
+    ]
     condition_checks = [
         check for row in rows for check in row["required_condition_checks"]
     ]
@@ -212,6 +237,11 @@ def evaluate_answers(
         "status_accuracy": round(mean(r["status_correct"] for r in rows), 4),
         "case_pass_rate": round(mean(r["case_passed"] for r in rows), 4),
         "citation_consistency_rate": round(mean(r["citation_consistent"] for r in rows), 4),
+        "retrieval_traced_positive_count": len(traced_positives),
+        "retrieval_gold_rate_of_traced_positives": (
+            round(mean(r["retrieval_gold_rank"] is not None for r in traced_positives), 4)
+            if traced_positives else None
+        ),
         "gold_section_citation_rate": round(
             mean(r["gold_section_cited"] for r in positives), 4
         ) if positives else None,
@@ -257,8 +287,10 @@ def evaluate_answers(
             "Required answer concepts are lexical checks, not proof of entailment; "
             "they may miss paraphrases or accept false statements containing the terms.",
             "These are curated in/out-of-corpus questions, not blinded legal QA accuracy.",
-            "Negative labels concern only the current indexed section subset; "
-            "these legal questions may have valid answers outside that subset.",
+            "Negative labels are corpus-relative; such legal questions can have valid "
+            "answers outside the indexed sources.",
+            "Retrieval candidates are pre-generation hits, not necessarily the exact "
+            "evidence sent to the model after statute scoping and context limits.",
             "Language detection uses a function-word heuristic; "
             "short or mixed answers remain unclassified.",
             "Language mismatch flags are for human review, "
@@ -308,6 +340,17 @@ def evaluate_answers(
                 f"- Observed language (heuristic): `{row['observed_answer_language']}`",
                 f"- Language matches question (heuristic): `{row['language_match_heuristic']}`",
                 f"- Returned URLs: {', '.join(row['returned_source_urls']) or '(none)'}",
+                f"- Gold section in retrieved candidates (rank): "
+                f"{row['retrieval_gold_rank'] or '(not found / trace unavailable)'}",
+                "- Retrieved candidates: "
+                + (
+                    ", ".join(
+                        str(hit["rank"]) + ":" + hit["url"]
+                        for hit in row["retrieval_candidates"]
+                    )
+                    if row["retrieval_candidates"] is not None
+                    else "(unavailable)"
+                ),
                 f"- Answer: {row['answer']}",
                 "",
             ]
