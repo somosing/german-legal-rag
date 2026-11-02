@@ -153,3 +153,24 @@ irrelevant sources. It is *not* a semantic evidence selector or token
 budget guarantee. Check whether §51 is present in `build_evidence(hits)`,
 whether Qwen cites the correct law, and whether the entire 22-question
 benchmark holds up. This policy remains experimental until tested.
+
+## Targeted citation-format retry experiment
+
+An observed Qwen generation for §51 BGB contained two correct-sounding
+sentences but cited only the second. Both attempts were rejected by the
+sentence-level citation checker, despite retrieving the correct statute.
+
+On the second pass **only when the first failure is `uncited_sentence`**,
+generation now supplies the previous draft as explicitly untrusted text,
+requests a single cited sentence for a one-fact question (or fully cited
+sentences for multi-part questions), and requires citation IDs to match
+the original retrieved evidence. The application never inserts citations
+programmatically, never changes an already valid first answer, and still
+abstains if the second draft fails validation. The law identity and
+statutory-condition safeguards remain active.
+
+This is a **prompt-repair experiment**, not a factual-support validator.
+If the model cites an irrelevant or unsupportive source, the structural
+validator may still accept the answer; independent legal review is required.
+Measure against the same full-BGB index and 22-question fixture before
+making claims about quality improvement.
