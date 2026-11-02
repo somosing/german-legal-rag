@@ -406,3 +406,61 @@ def test_condition_repair_requires_source_wording():
     )
     assert "weitere Beeinträchtigungen" in answer
     assert metrics["generation_attempts"] == 2
+
+def test_uncited_sentence_retry_uses_draft_and_demands_attributed_claim():
+    first = (
+        "The rule lasts one year. The source states the duration is one year [S1]."
+    )
+    repaired = "The rule lasts one year [S1]."
+
+    class Capture(SequenceLLM):
+        def chat(self, system, user, response_format=None):
+            if self.calls:
+                assert "SECOND-PASS FORMAT REPAIR" in user
+                assert "<previous_draft>" in user
+                assert first in user
+                assert "Do not write an uncited summary sentence" in user
+                assert "exactly ONE complete factual sentence" in user
+                assert "ONLY actual source IDs" in user
+            return super().chat(system, user, response_format)
+
+    mocked = Capture([
+        response(answer=first),
+        response(answer=repaired),
+    ])
+    result, sources, metrics = generate(
+        "How long does the rule last?",
+        sample_hits(), mocked, retry_on_failure=True,
+    )
+    assert result == repaired
+    assert [s["source_id"] for s in sources] == ["S1"]
+    assert metrics["first_pass_validation_error"] == "uncited_sentence"
+    assert metrics["final_validation_error"] is None
+    assert metrics["generation_attempts"] == 2
+
+
+def test_uncited_second_draft_still_fails_closed():
+    draft = response(
+        answer="The period lasts one year. The statute states this [S1]."
+    )
+    model = SequenceLLM([draft, draft])
+    result, sources, metrics = generate(
+        "How long?", sample_hits(), model, retry_on_failure=True,
+    )
+    assert result == abstention("How long?")
+    assert sources == []
+    assert metrics["abstained"] is True
+    assert metrics["final_validation_error"] == "uncited_sentence"
+
+
+def test_retry_does_not_reuse_wrong_source_id():
+    first = response(answer="A legal rule applies. According to law [S1].")
+    wrong = response(answer="A legal rule applies [S8].", citations=["S8"])
+    model = SequenceLLM([first, wrong])
+    _, sources, metrics = generate(
+        "What rule?", sample_hits(), model, retry_on_failure=True,
+    )
+    assert model.calls == 2
+    assert sources == []
+    assert metrics["abstained"]
+    assert metrics["final_validation_error"] == "unknown_source_id"
