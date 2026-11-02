@@ -134,3 +134,22 @@ RAG_RETRY_ON_FAILURE=true uv run legal-rag eval-answers \
   --gold examples/bgb_full_answer_questions.json \
   --output reports/bgb_full_dense_neighbors_v1 --mode dense_neighbors
 ```
+
+## Balanced neighbor evidence experiment
+
+The context builder previously packed each retrieval result with up to
+1050 characters of child text and 1450 parent characters, and stopped at
+9000 total. This meant §51 BGB was *retrieved* in the neighbor experiment
+but excluded from the text sent to Ollama.
+
+When more than four results are present, the new experimental packing
+divides the 9000-character budget across all hits, prioritizing each
+hit's own passage text and allocating remaining space to its parent.
+The standard four-hit retrieval path retains its original rich context.
+
+This prevents early long documents from consuming all the character budget
+but may truncate important legal qualifications and introduce more
+irrelevant sources. It is *not* a semantic evidence selector or token
+budget guarantee. Check whether §51 is present in `build_evidence(hits)`,
+whether Qwen cites the correct law, and whether the entire 22-question
+benchmark holds up. This policy remains experimental until tested.
