@@ -116,7 +116,7 @@ def test_english_question_prompt_enforces_english_output():
             return super().chat(system, user, response_format)
 
     answer, _, _ = generate(
-        "Who qualifies as a consumer under the BGB?", sample_hits(), Capture(response())
+        "Who qualifies as a consumer under the BGB?", [bgb_hit("13")], Capture(response())
     )
     assert answer
 
