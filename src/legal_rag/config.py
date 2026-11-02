@@ -26,6 +26,7 @@ class Settings:
     candidates: int
     final_k: int
     retry_on_failure: bool = False
+    structured_claim_repair: bool = False
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -41,4 +42,7 @@ class Settings:
             final_k=_env_int("RAG_FINAL_K", 4),
             retry_on_failure=os.getenv("RAG_RETRY_ON_FAILURE", "false").lower()
             in {"1", "true", "yes"},
+            structured_claim_repair=os.getenv(
+                "RAG_STRUCTURED_CLAIM_REPAIR", "false"
+            ).lower() in {"1", "true", "yes"},
         )
