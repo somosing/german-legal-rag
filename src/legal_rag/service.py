@@ -31,7 +31,9 @@ class RAGService:
         start = perf_counter()
         hits, retrieval = self.retriever.search(query, mode=mode)
         answer, sources, generation = generate(
-            query, hits, self.model, retry_on_failure=self.settings.retry_on_failure
+            query, hits, self.model,
+            retry_on_failure=self.settings.retry_on_failure,
+            structured_claim_repair=self.settings.structured_claim_repair,
         )
         result = {
             "answer": answer,

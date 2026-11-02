@@ -174,3 +174,32 @@ If the model cites an irrelevant or unsupportive source, the structural
 validator may still accept the answer; independent legal review is required.
 Measure against the same full-BGB index and 22-question fixture before
 making claims about quality improvement.
+
+## Structured claim repair (opt-in experiment)
+
+Repeated Qwen 4B failures cite a *second* restatement while leaving the
+first factual sentence uncited, even after a targeted prompt retry.
+The opt-in `RAG_STRUCTURED_CLAIM_REPAIR=true` changes **only the second
+generation attempt** after `uncited_sentence`: the model returns an array
+of separate claims, each specifying a source ID and an exact, continuous
+source quote. Code verifies that the quote occurs inside **that cited
+source** in the actual packed evidence and then renders one citation per
+claim. The ordinary sentence-level citation and statute guards still run.
+
+The initial answer, ordinary retry, and refusal behavior are unchanged
+unless the environment variable is explicitly enabled. No embeddings,
+index data, or retrieval ranking changes are required.
+
+This establishes **quote presence and citation structure, not legal
+entailment**. A quotation may be irrelevant to a claim. It can also
+falsely reject valid paraphrases because the supporting quote must match
+the supplied evidence literally. Review answers independently and keep
+the experiment separate from any unblinded benchmark headline.
+
+```bash
+export RAG_STATE_DIR="$HOME/rag-indices/bgb-full"
+RAG_RETRY_ON_FAILURE=true RAG_STRUCTURED_CLAIM_REPAIR=true \
+  uv run legal-rag ask \
+  "How long is the waiting period for distributing the property of a dissolved association?" \
+  --mode dense_neighbors
+```
