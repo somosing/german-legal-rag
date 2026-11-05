@@ -1,0 +1,37 @@
+name: Bug report
+description: Reproducible code, CLI, or documentation failure (do not post private legal data)
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Use only fictional/public inputs. Never include credentials, personal information or confidential documents."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What failed, and what was the expected behavior?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Commands and sample inputs (redact all secrets)
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit, OS, Python, uv, Ollama model, corpus snapshot, retrieval mode
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Error output or observed metrics
+      description: Redacted logs only; specify which evaluator reported a failure
+    validations:
+      required: false
