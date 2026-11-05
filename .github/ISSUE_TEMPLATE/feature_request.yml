@@ -1,0 +1,29 @@
+name: Feature proposal
+description: Discuss an evidence-first capability or improvement
+title: "[Proposal] "
+body:
+  - type: dropdown
+    id: path
+    attributes:
+      label: Area
+      options:
+        - Path A — German Law Explorer
+        - Path B — Private research workspace
+        - Core retrieval / generation / evaluation
+        - Developer experience / accessibility / docs
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: User problem
+      description: Who needs this and what is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed approach and alternatives
+      description: Include trade-offs, privacy/source risks, and how it could be tested
+    validations:
+      required: true
